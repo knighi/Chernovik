@@ -85,7 +85,6 @@
   #drawCanvas { z-index: 2; touch-action: none; }
   #effectLayer { z-index: 3; pointer-events: none; }
 
-  /* Тусклое описание фона */
   #bgDesc {
     position: absolute;
     top: 8%;
@@ -105,7 +104,6 @@
   }
   #bgDesc.visible { display: block; }
 
-  /* Фразы — максимум 2 одновременно */
   #phrasesLayer {
     position: absolute;
     inset: 0;
@@ -322,6 +320,10 @@
     display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;
   }
   .modal .box .posGrid label { margin: 0; }
+  .modal .box .sizeRow {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  }
+  .modal .box .sizeRow label { margin: 0; }
 
   .hidden { display: none !important; }
 
@@ -405,34 +407,55 @@
     <h3>Фраза</h3>
     <label>Текст</label>
     <textarea id="phraseText" placeholder="Введите фразу..."></textarea>
-    <label>Размер шрифта (px)</label>
-    <input type="number" id="phraseSize" value="22" min="10" max="60">
+
     <label>Цвет</label>
     <input type="color" id="phraseColor" value="#1a1a1a">
-    <label>Шрифт на переднем плане (текущая фраза)</label>
-    <select id="phraseFontFront">
-      <option value="system-ui, sans-serif">Sans-serif (по умолчанию)</option>
-      <option value="Georgia, serif">Serif</option>
-      <option value="'Courier New', monospace">Monospace</option>
-      <option value="'Comic Sans MS', cursive">Cursive</option>
-      <option value="'Brush Script MT', cursive">Рукописный</option>
-      <option value="Impact, sans-serif">Impact</option>
-      <option value="'Times New Roman', serif">Times</option>
-      <option value="Verdana, sans-serif">Verdana</option>
-    </select>
-    <label>Шрифт на заднем плане (предыдущая фраза)</label>
-    <select id="phraseFontBack">
-      <option value="system-ui, sans-serif">Sans-serif (по умолчанию)</option>
-      <option value="Georgia, serif">Serif</option>
-      <option value="'Courier New', monospace">Monospace</option>
-      <option value="'Comic Sans MS', cursive">Cursive</option>
-      <option value="'Brush Script MT', cursive">Рукописный</option>
-      <option value="Impact, sans-serif">Impact</option>
-      <option value="'Times New Roman', serif">Times</option>
-      <option value="Verdana, sans-serif">Verdana</option>
-    </select>
-    <label>Длительность показа (сек), 0 = держать</label>
+
+    <div style="font-size:11px;color:#b8a8ff;margin-top:12px;margin-bottom:4px;">ПЕРЕДНИЙ ПЛАН (текущая фраза)</div>
+    <div class="sizeRow">
+      <div>
+        <label>Размер шрифта (px)</label>
+        <input type="number" id="phraseSizeFront" value="22" min="8" max="80">
+      </div>
+      <div>
+        <label>Шрифт</label>
+        <select id="phraseFontFront">
+          <option value="system-ui, sans-serif">Sans-serif</option>
+          <option value="Georgia, serif">Serif</option>
+          <option value="'Courier New', monospace">Monospace</option>
+          <option value="'Comic Sans MS', cursive">Cursive</option>
+          <option value="'Brush Script MT', cursive">Рукописный</option>
+          <option value="Impact, sans-serif">Impact</option>
+          <option value="'Times New Roman', serif">Times</option>
+          <option value="Verdana, sans-serif">Verdana</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:#b8a8ff;margin-top:12px;margin-bottom:4px;">ЗАДНИЙ ПЛАН (предыдущая фраза)</div>
+    <div class="sizeRow">
+      <div>
+        <label>Размер шрифта (px)</label>
+        <input type="number" id="phraseSizeBack" value="16" min="8" max="80">
+      </div>
+      <div>
+        <label>Шрифт</label>
+        <select id="phraseFontBack">
+          <option value="system-ui, sans-serif">Sans-serif</option>
+          <option value="Georgia, serif">Serif</option>
+          <option value="'Courier New', monospace">Monospace</option>
+          <option value="'Comic Sans MS', cursive">Cursive</option>
+          <option value="'Brush Script MT', cursive">Рукописный</option>
+          <option value="Impact, sans-serif">Impact</option>
+          <option value="'Times New Roman', serif">Times</option>
+          <option value="Verdana, sans-serif">Verdana</option>
+        </select>
+      </div>
+    </div>
+
+    <label style="margin-top:12px;">Длительность показа (сек), 0 = держать</label>
     <input type="number" id="phraseDur" value="0" min="0">
+
     <label>Аудио</label>
     <div class="row">
       <button id="btnRecAudio">🎙 Запись</button>
@@ -448,7 +471,7 @@
   </div>
 </div>
 
-<!-- МОДАЛКА КНОПКИ (Выбор / Далее) -->
+<!-- МОДАЛКА КНОПКИ -->
 <div class="modal hidden" id="choiceModal">
   <div class="box">
     <h3 id="choiceModalTitle">Кнопка</h3>
@@ -540,7 +563,7 @@
 /* ============================================================
    МОДЕЛЬ
    ============================================================ */
-const STORAGE_KEY = 'game_draft_v4';
+const STORAGE_KEY = 'game_draft_v5';
 let state = { scenes: [], currentId: null };
 
 function uid() { return 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
@@ -915,13 +938,6 @@ function floodFill(p) {
 /* ============================================================
    ФРАЗЫ — 2 слота (текущая + предыдущая)
    ============================================================ */
-function phraseFrontFont(ph) {
-  return ph.fontFront || 'system-ui, sans-serif';
-}
-function phraseBackFont(ph) {
-  return ph.fontBack || 'system-ui, sans-serif';
-}
-
 function renderPhrases() {
   const layer = document.getElementById('phrasesLayer');
   layer.innerHTML = '';
@@ -931,7 +947,6 @@ function renderPhrases() {
     div.className = 'phrase';
     div.dataset.id = ph.id;
     div.textContent = ph.text;
-    div.style.fontSize = (ph.size || 22) + 'px';
     div.style.color = ph.color || '#1a1a1a';
     layer.appendChild(div);
   });
@@ -939,24 +954,26 @@ function renderPhrases() {
 }
 
 /* Всего 2 видимых слота: 0 = текущая (передний план), 1 = предыдущая (задний план).
-   Фраза на слоте 2 исчезает. */
+   Фраза на слоте 2 исчезает. У каждой фразы свои размеры и шрифты для переднего и заднего плана. */
 function updatePhraseSlots(visibleCount) {
   const els = Array.from(document.querySelectorAll('#phrasesLayer .phrase'));
   const n = visibleCount;
   els.forEach((el, i) => {
     el.classList.remove('slot-0', 'slot-1', 'slot-2');
     const fromEnd = n - 1 - i;
+    const ph = currentScene.phrases[i];
     if (fromEnd === 0) {
       el.classList.add('slot-0');
-      // шрифт переднего плана берём у текущей фразы
-      el.style.fontFamily = phraseFrontFont(currentScene.phrases[i]);
+      el.style.fontSize = (ph.sizeFront || 22) + 'px';
+      el.style.fontFamily = ph.fontFront || 'system-ui, sans-serif';
     } else if (fromEnd === 1) {
       el.classList.add('slot-1');
-      // шрифт заднего плана берём у предыдущей
-      el.style.fontFamily = phraseBackFont(currentScene.phrases[i]);
+      el.style.fontSize = (ph.sizeBack || 16) + 'px';
+      el.style.fontFamily = ph.fontBack || 'system-ui, sans-serif';
     } else {
       el.classList.add('slot-2');
-      el.style.fontFamily = phraseBackFont(currentScene.phrases[i]);
+      el.style.fontSize = (ph.sizeBack || 16) + 'px';
+      el.style.fontFamily = ph.fontBack || 'system-ui, sans-serif';
     }
   });
 }
@@ -965,7 +982,7 @@ function updatePhraseSlots(visibleCount) {
    КНОПКИ / ВЫБОРЫ / ДАЛЕЕ
    ============================================================ */
 let editingChoiceId = null;
-let editingChoiceKind = 'choice'; // 'choice' | 'next'
+let editingChoiceKind = 'choice';
 
 function renderChoices() {
   const layer = document.getElementById('choicesLayer');
@@ -986,7 +1003,6 @@ function renderChoices() {
     span.textContent = ch.label;
     btn.appendChild(span);
 
-    // маркер редактирования в редакторе
     if (!playing) {
       const dot = document.createElement('span');
       dot.className = 'editDot';
@@ -997,7 +1013,6 @@ function renderChoices() {
     btn.onclick = (e) => {
       e.stopPropagation();
       if (playing) {
-        // переход
         if (ch.targetId) {
           const t = findScene(ch.targetId);
           if (t) { openScene(t.id); startPlaying(); }
@@ -1010,7 +1025,6 @@ function renderChoices() {
           startPlaying();
         }
       } else {
-        // редактирование
         openChoiceModal(ch.id);
       }
     };
@@ -1072,11 +1086,7 @@ function saveChoice() {
   if (!label) { alert('Введите надпись'); return; }
   const targetVal = document.getElementById('choiceTarget').value;
   let targetId = null;
-  if (targetVal === 'new' && !editingChoiceId) {
-    const ns = newScene(currentScene.id);
-    targetId = ns.id;
-  } else if (targetVal === 'new') {
-    // редактирование существующей, но выбрали "новая"
+  if (targetVal === 'new') {
     const ns = newScene(currentScene.id);
     targetId = ns.id;
   } else targetId = targetVal;
@@ -1148,7 +1158,7 @@ function applyEffect() {
 }
 
 /* ============================================================
-   ПРОИГРЫВАНИЕ — 2 фразы на экране
+   ПРОИГРЫВАНИЕ
    ============================================================ */
 function startPlaying() {
   if (!currentScene || playing) return;
@@ -1171,32 +1181,32 @@ function startPlaying() {
     const div = document.createElement('div');
     div.className = 'phrase';
     div.textContent = ph.text;
-    div.style.fontSize = (ph.size || 22) + 'px';
     div.style.color = ph.color || '#1a1a1a';
     layer.appendChild(div);
 
-    // пересчёт слотов (только 2 видимых)
+    // пересчёт слотов (только 2 видимых), у каждой фразы свои размеры и шрифты
     const all = Array.from(layer.querySelectorAll('.phrase'));
     all.forEach((el, i) => {
       el.classList.remove('slot-0', 'slot-1', 'slot-2');
       const fromEnd = all.length - 1 - i;
       const srcPh = currentScene.phrases[idx - (all.length - 1 - i)];
+      if (!srcPh) return;
       if (fromEnd === 0) {
         el.classList.add('slot-0');
-        el.style.fontFamily = phraseFrontFont(srcPh);
+        el.style.fontSize = (srcPh.sizeFront || 22) + 'px';
+        el.style.fontFamily = srcPh.fontFront || 'system-ui, sans-serif';
       } else if (fromEnd === 1) {
         el.classList.add('slot-1');
-        el.style.fontFamily = phraseBackFont(srcPh);
+        el.style.fontSize = (srcPh.sizeBack || 16) + 'px';
+        el.style.fontFamily = srcPh.fontBack || 'system-ui, sans-serif';
       } else {
         el.classList.add('slot-2');
-        el.style.fontFamily = phraseBackFont(srcPh);
+        el.style.fontSize = (srcPh.sizeBack || 16) + 'px';
+        el.style.fontFamily = srcPh.fontBack || 'system-ui, sans-serif';
       }
     });
-    // удаляем невидимые (слот 2) через задержку
     all.forEach(el => {
-      if (el.classList.contains('slot-2')) {
-        setTimeout(() => el.remove(), 750);
-      }
+      if (el.classList.contains('slot-2')) setTimeout(() => el.remove(), 750);
     });
 
     if (ph.audio) {
@@ -1205,7 +1215,6 @@ function startPlaying() {
     }
 
     idx++;
-    // длительность: если задана — берём её, иначе 2.2 сек
     const dur = (ph.dur && ph.dur > 0) ? ph.dur * 1000 : 2200;
     if (idx < total) {
       playTimers.push(setTimeout(showNext, dur));
@@ -1239,7 +1248,7 @@ function openAllButtonsModal() {
   if (currentScene.choices.length === 0) {
     list.innerHTML = '<p style="color:#666;font-size:11px;">Нет кнопок</p>';
   }
-  currentScene.choices.forEach((ch, i) => {
+  currentScene.choices.forEach(ch => {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:5px;align-items:center;margin-bottom:5px;background:#1a1a22;padding:6px;border-radius:5px;';
     row.innerHTML = `
@@ -1307,18 +1316,20 @@ function openPhraseModal(editId) {
     const ph = currentScene.phrases.find(p => p.id === editId);
     if (ph) {
       document.getElementById('phraseText').value = ph.text;
-      document.getElementById('phraseSize').value = ph.size || 22;
       document.getElementById('phraseColor').value = ph.color || '#1a1a1a';
+      document.getElementById('phraseSizeFront').value = ph.sizeFront || 22;
       document.getElementById('phraseFontFront').value = ph.fontFront || 'system-ui, sans-serif';
+      document.getElementById('phraseSizeBack').value = ph.sizeBack || 16;
       document.getElementById('phraseFontBack').value = ph.fontBack || 'system-ui, sans-serif';
       document.getElementById('phraseDur').value = ph.dur || 0;
       document.getElementById('audioStatus').textContent = ph.audio ? '✅ Аудио прикреплено' : '';
     }
   } else {
     document.getElementById('phraseText').value = '';
-    document.getElementById('phraseSize').value = 22;
     document.getElementById('phraseColor').value = '#1a1a1a';
+    document.getElementById('phraseSizeFront').value = 22;
     document.getElementById('phraseFontFront').value = 'system-ui, sans-serif';
+    document.getElementById('phraseSizeBack').value = 16;
     document.getElementById('phraseFontBack').value = 'system-ui, sans-serif';
     document.getElementById('phraseDur').value = 0;
   }
@@ -1331,9 +1342,10 @@ function savePhrase() {
   const data = {
     id: editingPhraseId || uid(),
     text,
-    size: parseInt(document.getElementById('phraseSize').value) || 22,
     color: document.getElementById('phraseColor').value,
+    sizeFront: parseInt(document.getElementById('phraseSizeFront').value) || 22,
     fontFront: document.getElementById('phraseFontFront').value,
+    sizeBack: parseInt(document.getElementById('phraseSizeBack').value) || 16,
     fontBack: document.getElementById('phraseFontBack').value,
     dur: parseInt(document.getElementById('phraseDur').value) || 0,
     audio: null,
