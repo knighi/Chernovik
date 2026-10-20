@@ -28,7 +28,6 @@
     width: 100%;
   }
 
-  /* ===== ВЕРХНЯЯ ПАНЕЛЬ (кнопки прежнего размера) ===== */
   .toolbar {
     background: #2a2a32;
     padding: 6px;
@@ -54,7 +53,6 @@
   .toolbar input[type=color] { padding: 2px; width: 34px; height: 30px; }
   .toolbar .group { display: flex; gap: 2px; align-items: center; }
 
-  /* ===== ХОЛСТ — уменьшенный масштаб ===== */
   #canvasWrap {
     flex: 1 1 0;
     min-height: 0;
@@ -68,7 +66,6 @@
   }
   #phone {
     position: relative;
-    /* уменьшенный масштаб — с полями по бокам */
     width: min(88vw, 380px);
     height: min(72vh, 640px);
     max-height: 100%;
@@ -88,11 +85,31 @@
   #drawCanvas { z-index: 2; touch-action: none; }
   #effectLayer { z-index: 3; pointer-events: none; }
 
-  /* ===== ФРАЗЫ ===== */
+  /* Тусклое описание фона */
+  #bgDesc {
+    position: absolute;
+    top: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 86%;
+    text-align: center;
+    color: rgba(40,40,40,0.22);
+    font-size: 12px;
+    font-style: italic;
+    font-weight: 400;
+    pointer-events: none;
+    z-index: 4;
+    white-space: pre-wrap;
+    line-height: 1.3;
+    display: none;
+  }
+  #bgDesc.visible { display: block; }
+
+  /* Фразы — максимум 2 одновременно */
   #phrasesLayer {
     position: absolute;
     inset: 0;
-    z-index: 4;
+    z-index: 5;
     pointer-events: none;
     overflow: hidden;
   }
@@ -108,15 +125,13 @@
     line-height: 1.25;
   }
   .phrase.slot-0 { opacity: 1; bottom: 14%; }
-  .phrase.slot-1 { opacity: 0.35; bottom: 28%; }
-  .phrase.slot-2 { opacity: 0.12; bottom: 40%; }
-  .phrase.slot-3 { opacity: 0; bottom: 50%; }
+  .phrase.slot-1 { opacity: 0.35; bottom: 30%; }
+  .phrase.slot-2 { opacity: 0; bottom: 42%; }
 
-  /* ===== КНОПКИ В СЦЕНЕ ===== */
   #choicesLayer {
     position: absolute;
     inset: 0;
-    z-index: 5;
+    z-index: 6;
     pointer-events: none;
   }
   .choiceBtn {
@@ -135,10 +150,26 @@
     max-width: 80%;
   }
   .choiceBtn:active { transform: translateX(-50%) scale(0.96); }
+  .choiceBtn .editDot {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 18px;
+    height: 18px;
+    background: #6a5acd;
+    color: #fff;
+    border-radius: 50%;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #fff;
+  }
+  #phone.playing .choiceBtn .editDot { display: none; }
 
   #btnPlayScene {
     position: absolute;
-    z-index: 6;
+    z-index: 7;
     right: 8px;
     bottom: 8px;
     background: #6a5acd;
@@ -161,7 +192,7 @@
   #phone.playing #btnStopPlay { display: flex; }
   #btnStopPlay {
     position: absolute;
-    z-index: 7;
+    z-index: 8;
     right: 8px;
     top: 8px;
     background: #c0504d;
@@ -178,7 +209,6 @@
     box-shadow: 0 3px 10px rgba(0,0,0,0.4);
   }
 
-  /* ===== НИЖНЯЯ ПАНЕЛЬ — гарантированно видна ===== */
   .bottomBar {
     background: #2a2a32;
     padding: 6px;
@@ -205,7 +235,6 @@
   .bottomBar button:active { transform: scale(0.96); }
   .bottomBar button.primary { background: #6a5acd; border-color: #8a7aed; }
 
-  /* ===== ГЛАВНЫЙ ЭКРАН ===== */
   #homeScreen {
     position: fixed;
     inset: 0;
@@ -262,7 +291,6 @@
   .sceneCard .actions .del { background: #6a3030; }
   .sceneCard .actions .edit { background: #4a6a30; }
 
-  /* ===== МОДАЛКИ ===== */
   .modal {
     position: fixed; inset: 0; background: rgba(0,0,0,0.8);
     z-index: 200; display: flex; align-items: center; justify-content: center;
@@ -309,7 +337,6 @@
 <body>
 <div id="app">
 
-  <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
   <div class="toolbar" id="drawToolbar">
     <button id="btnBackHome">🏠</button>
     <div class="group">
@@ -334,12 +361,12 @@
     <button id="btnImageBg">🖼</button>
   </div>
 
-  <!-- ХОЛСТ -->
   <div id="canvasWrap">
     <div id="phone">
       <canvas id="sceneCanvas"></canvas>
       <canvas id="drawCanvas"></canvas>
       <div id="effectLayer"></div>
+      <div id="bgDesc"></div>
       <div id="phrasesLayer"></div>
       <div id="choicesLayer"></div>
       <button id="btnPlayScene" title="Начать сцену">▶</button>
@@ -347,18 +374,18 @@
     </div>
   </div>
 
-  <!-- НИЖНЯЯ ПАНЕЛЬ -->
   <div class="bottomBar" id="bottomBar">
     <button id="btnAddPhrase">＋ Фраза</button>
     <button id="btnAddChoice">＋ Выбор</button>
     <button id="btnAddNext">＋ Далее</button>
     <button id="btnEffects">✨ Эффекты</button>
+    <button id="btnBgDesc">🖼 Описание</button>
     <button id="btnTexts">📝 Тексты</button>
     <button id="btnSave" class="primary">💾 Сохр.</button>
+    <button id="btnAllButtons">⚙️ Все кнопки</button>
   </div>
 </div>
 
-<!-- ГЛАВНЫЙ ЭКРАН -->
 <div id="homeScreen">
   <h1>📖 Черновик игры</h1>
   <div class="homeActions">
@@ -375,13 +402,37 @@
 <!-- МОДАЛКА ФРАЗЫ -->
 <div class="modal hidden" id="phraseModal">
   <div class="box">
-    <h3>Текст фразы</h3>
+    <h3>Фраза</h3>
     <label>Текст</label>
     <textarea id="phraseText" placeholder="Введите фразу..."></textarea>
     <label>Размер шрифта (px)</label>
     <input type="number" id="phraseSize" value="22" min="10" max="60">
     <label>Цвет</label>
     <input type="color" id="phraseColor" value="#1a1a1a">
+    <label>Шрифт на переднем плане (текущая фраза)</label>
+    <select id="phraseFontFront">
+      <option value="system-ui, sans-serif">Sans-serif (по умолчанию)</option>
+      <option value="Georgia, serif">Serif</option>
+      <option value="'Courier New', monospace">Monospace</option>
+      <option value="'Comic Sans MS', cursive">Cursive</option>
+      <option value="'Brush Script MT', cursive">Рукописный</option>
+      <option value="Impact, sans-serif">Impact</option>
+      <option value="'Times New Roman', serif">Times</option>
+      <option value="Verdana, sans-serif">Verdana</option>
+    </select>
+    <label>Шрифт на заднем плане (предыдущая фраза)</label>
+    <select id="phraseFontBack">
+      <option value="system-ui, sans-serif">Sans-serif (по умолчанию)</option>
+      <option value="Georgia, serif">Serif</option>
+      <option value="'Courier New', monospace">Monospace</option>
+      <option value="'Comic Sans MS', cursive">Cursive</option>
+      <option value="'Brush Script MT', cursive">Рукописный</option>
+      <option value="Impact, sans-serif">Impact</option>
+      <option value="'Times New Roman', serif">Times</option>
+      <option value="Verdana, sans-serif">Verdana</option>
+    </select>
+    <label>Длительность показа (сек), 0 = держать</label>
+    <input type="number" id="phraseDur" value="0" min="0">
     <label>Аудио</label>
     <div class="row">
       <button id="btnRecAudio">🎙 Запись</button>
@@ -397,10 +448,10 @@
   </div>
 </div>
 
-<!-- МОДАЛКА КНОПКИ -->
+<!-- МОДАЛКА КНОПКИ (Выбор / Далее) -->
 <div class="modal hidden" id="choiceModal">
   <div class="box">
-    <h3>Кнопка выбора / Далее</h3>
+    <h3 id="choiceModalTitle">Кнопка</h3>
     <label>Надпись на кнопке</label>
     <input type="text" id="choiceLabel" placeholder="Например: Пойти налево">
     <label>Заливка</label>
@@ -422,6 +473,9 @@
     <div class="row">
       <button onclick="closeModal('choiceModal')">Отмена</button>
       <button class="ok" onclick="saveChoice()">Готово</button>
+    </div>
+    <div class="row" id="choiceDeleteRow" style="display:none;">
+      <button onclick="deleteEditingChoice()" style="background:#6a3030;">Удалить кнопку</button>
     </div>
   </div>
 </div>
@@ -445,6 +499,32 @@
   </div>
 </div>
 
+<!-- МОДАЛКА ОПИСАНИЯ ФОНА -->
+<div class="modal hidden" id="bgDescModal">
+  <div class="box">
+    <h3>Описание фона</h3>
+    <label>Что изображено на фоне (тусклая надпись)</label>
+    <textarea id="bgDescText" placeholder="Например: Тёмный лес, туман, силуэты деревьев..."></textarea>
+    <label>Размер шрифта (px)</label>
+    <input type="number" id="bgDescSize" value="12" min="8" max="30">
+    <div class="row">
+      <button onclick="closeModal('bgDescModal')">Отмена</button>
+      <button class="ok" onclick="saveBgDesc()">Готово</button>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛКА ВСЕХ КНОПОК -->
+<div class="modal hidden" id="allButtonsModal">
+  <div class="box">
+    <h3>Все кнопки на листе</h3>
+    <div id="allButtonsList"></div>
+    <div class="row">
+      <button onclick="closeModal('allButtonsModal')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
 <!-- МОДАЛКА ТЕКСТОВ -->
 <div class="modal hidden" id="textsModal">
   <div class="box">
@@ -460,7 +540,7 @@
 /* ============================================================
    МОДЕЛЬ
    ============================================================ */
-const STORAGE_KEY = 'game_draft_v3';
+const STORAGE_KEY = 'game_draft_v4';
 let state = { scenes: [], currentId: null };
 
 function uid() { return 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
@@ -475,6 +555,8 @@ function newScene(parentId) {
     drawing: null,
     bgImage: null,
     bgColor: '#ffffff',
+    bgDesc: '',
+    bgDescSize: 12,
     parentId: parentId || null,
   };
   state.scenes.push(s);
@@ -625,6 +707,7 @@ function openScene(id) {
   }
 
   renderSceneBackground();
+  renderBgDesc();
   renderPhrases();
   renderChoices();
   applyEffect();
@@ -633,7 +716,7 @@ function openScene(id) {
 }
 
 /* ============================================================
-   ФОН
+   ФОН И ОПИСАНИЕ
    ============================================================ */
 function renderSceneBackground() {
   if (!currentScene || !ctxScene) return;
@@ -648,6 +731,34 @@ function renderSceneBackground() {
     img.onload = () => ctxScene.drawImage(img, 0, 0, w, h);
     img.src = currentScene.bgImage;
   }
+}
+
+function renderBgDesc() {
+  const el = document.getElementById('bgDesc');
+  if (!currentScene || !currentScene.bgDesc) {
+    el.classList.remove('visible');
+    el.textContent = '';
+    return;
+  }
+  el.textContent = currentScene.bgDesc;
+  el.style.fontSize = (currentScene.bgDescSize || 12) + 'px';
+  el.classList.add('visible');
+}
+
+function openBgDescModal() {
+  if (!currentScene) return;
+  document.getElementById('bgDescText').value = currentScene.bgDesc || '';
+  document.getElementById('bgDescSize').value = currentScene.bgDescSize || 12;
+  document.getElementById('bgDescModal').classList.remove('hidden');
+}
+
+function saveBgDesc() {
+  if (!currentScene) return;
+  currentScene.bgDesc = document.getElementById('bgDescText').value;
+  currentScene.bgDescSize = parseInt(document.getElementById('bgDescSize').value) || 12;
+  closeModal('bgDescModal');
+  renderBgDesc();
+  save();
 }
 
 /* ============================================================
@@ -802,8 +913,15 @@ function floodFill(p) {
 }
 
 /* ============================================================
-   ФРАЗЫ
+   ФРАЗЫ — 2 слота (текущая + предыдущая)
    ============================================================ */
+function phraseFrontFont(ph) {
+  return ph.fontFront || 'system-ui, sans-serif';
+}
+function phraseBackFont(ph) {
+  return ph.fontBack || 'system-ui, sans-serif';
+}
+
 function renderPhrases() {
   const layer = document.getElementById('phrasesLayer');
   layer.innerHTML = '';
@@ -820,22 +938,35 @@ function renderPhrases() {
   updatePhraseSlots(currentScene.phrases.length);
 }
 
+/* Всего 2 видимых слота: 0 = текущая (передний план), 1 = предыдущая (задний план).
+   Фраза на слоте 2 исчезает. */
 function updatePhraseSlots(visibleCount) {
   const els = Array.from(document.querySelectorAll('#phrasesLayer .phrase'));
   const n = visibleCount;
   els.forEach((el, i) => {
-    el.classList.remove('slot-0', 'slot-1', 'slot-2', 'slot-3');
+    el.classList.remove('slot-0', 'slot-1', 'slot-2');
     const fromEnd = n - 1 - i;
-    if (fromEnd === 0) el.classList.add('slot-0');
-    else if (fromEnd === 1) el.classList.add('slot-1');
-    else if (fromEnd === 2) el.classList.add('slot-2');
-    else el.classList.add('slot-3');
+    if (fromEnd === 0) {
+      el.classList.add('slot-0');
+      // шрифт переднего плана берём у текущей фразы
+      el.style.fontFamily = phraseFrontFont(currentScene.phrases[i]);
+    } else if (fromEnd === 1) {
+      el.classList.add('slot-1');
+      // шрифт заднего плана берём у предыдущей
+      el.style.fontFamily = phraseBackFont(currentScene.phrases[i]);
+    } else {
+      el.classList.add('slot-2');
+      el.style.fontFamily = phraseBackFont(currentScene.phrases[i]);
+    }
   });
 }
 
 /* ============================================================
-   КНОПКИ / ВЫБОРЫ
+   КНОПКИ / ВЫБОРЫ / ДАЛЕЕ
    ============================================================ */
+let editingChoiceId = null;
+let editingChoiceKind = 'choice'; // 'choice' | 'next'
+
 function renderChoices() {
   const layer = document.getElementById('choicesLayer');
   layer.innerHTML = '';
@@ -843,35 +974,59 @@ function renderChoices() {
   currentScene.choices.forEach(ch => {
     const btn = document.createElement('button');
     btn.className = 'choiceBtn';
-    btn.textContent = ch.label;
+    btn.dataset.id = ch.id;
     btn.style.left = (ch.x ?? 50) + '%';
     btn.style.bottom = (ch.y ?? 20) + '%';
     btn.style.transform = 'translateX(-50%)';
     btn.style.background = ch.bg || '#ffffff';
     btn.style.color = ch.textColor || '#1a1a1a';
     btn.style.borderColor = ch.borderColor || '#222222';
-    btn.onclick = () => {
-      if (ch.targetId) {
-        const t = findScene(ch.targetId);
-        if (t) openScene(t.id);
-        else alert('Сцена не найдена');
+
+    const span = document.createElement('span');
+    span.textContent = ch.label;
+    btn.appendChild(span);
+
+    // маркер редактирования в редакторе
+    if (!playing) {
+      const dot = document.createElement('span');
+      dot.className = 'editDot';
+      dot.textContent = '✏️';
+      btn.appendChild(dot);
+    }
+
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      if (playing) {
+        // переход
+        if (ch.targetId) {
+          const t = findScene(ch.targetId);
+          if (t) { openScene(t.id); startPlaying(); }
+          else alert('Сцена не найдена');
+        } else {
+          const ns = newScene(currentScene.id);
+          ch.targetId = ns.id;
+          save();
+          openScene(ns.id);
+          startPlaying();
+        }
       } else {
-        const ns = newScene(currentScene.id);
-        ch.targetId = ns.id;
-        save();
-        openScene(ns.id);
+        // редактирование
+        openChoiceModal(ch.id);
       }
     };
     layer.appendChild(btn);
   });
 }
 
-let editingChoiceId = null;
-
-function openChoiceModal(editId) {
+function openChoiceModal(editId, kind) {
   if (!currentScene) return;
   editingChoiceId = editId || null;
-  document.getElementById('choiceModal').classList.remove('hidden');
+  editingChoiceKind = kind || 'choice';
+  const modal = document.getElementById('choiceModal');
+  modal.classList.remove('hidden');
+  const title = document.getElementById('choiceModalTitle');
+  title.textContent = editingChoiceKind === 'next' ? 'Кнопка «Далее»' : 'Кнопка выбора';
+
   const sel = document.getElementById('choiceTarget');
   sel.innerHTML = '<option value="new">— Новая пустая сцена —</option>';
   state.scenes.forEach(s => {
@@ -882,6 +1037,9 @@ function openChoiceModal(editId) {
       sel.appendChild(o);
     }
   });
+
+  document.getElementById('choiceDeleteRow').style.display = editId ? 'flex' : 'none';
+
   if (editId) {
     const ch = currentScene.choices.find(c => c.id === editId);
     if (ch) {
@@ -896,14 +1054,14 @@ function openChoiceModal(editId) {
       sel.value = ch.targetId || 'new';
     }
   } else {
-    document.getElementById('choiceLabel').value = '';
+    document.getElementById('choiceLabel').value = editingChoiceKind === 'next' ? '➡ Далее' : '';
     document.getElementById('choiceBg').value = '#ffffff';
     document.getElementById('choiceText').value = '#1a1a1a';
     document.getElementById('choiceBorder').value = '#222222';
     document.getElementById('choiceX').value = 50;
-    document.getElementById('choiceY').value = 20;
+    document.getElementById('choiceY').value = editingChoiceKind === 'next' ? 12 : 20;
     document.getElementById('choiceXVal').textContent = '50%';
-    document.getElementById('choiceYVal').textContent = '20%';
+    document.getElementById('choiceYVal').textContent = (editingChoiceKind === 'next' ? 12 : 20) + '%';
     sel.value = 'new';
   }
 }
@@ -914,7 +1072,11 @@ function saveChoice() {
   if (!label) { alert('Введите надпись'); return; }
   const targetVal = document.getElementById('choiceTarget').value;
   let targetId = null;
-  if (targetVal === 'new') {
+  if (targetVal === 'new' && !editingChoiceId) {
+    const ns = newScene(currentScene.id);
+    targetId = ns.id;
+  } else if (targetVal === 'new') {
+    // редактирование существующей, но выбрали "новая"
     const ns = newScene(currentScene.id);
     targetId = ns.id;
   } else targetId = targetVal;
@@ -935,6 +1097,16 @@ function saveChoice() {
   } else {
     currentScene.choices.push({ id: uid(), ...data });
   }
+  closeModal('choiceModal');
+  renderChoices();
+  save();
+}
+
+function deleteEditingChoice() {
+  if (!currentScene || !editingChoiceId) return;
+  if (!confirm('Удалить кнопку?')) return;
+  currentScene.choices = currentScene.choices.filter(c => c.id !== editingChoiceId);
+  editingChoiceId = null;
   closeModal('choiceModal');
   renderChoices();
   save();
@@ -976,7 +1148,7 @@ function applyEffect() {
 }
 
 /* ============================================================
-   ПРОИГРЫВАНИЕ
+   ПРОИГРЫВАНИЕ — 2 фразы на экране
    ============================================================ */
 function startPlaying() {
   if (!currentScene || playing) return;
@@ -997,31 +1169,47 @@ function startPlaying() {
     if (idx >= total) return;
     const ph = currentScene.phrases[idx];
     const div = document.createElement('div');
-    div.className = 'phrase slot-0';
+    div.className = 'phrase';
     div.textContent = ph.text;
     div.style.fontSize = (ph.size || 22) + 'px';
     div.style.color = ph.color || '#1a1a1a';
     layer.appendChild(div);
 
+    // пересчёт слотов (только 2 видимых)
     const all = Array.from(layer.querySelectorAll('.phrase'));
     all.forEach((el, i) => {
-      el.classList.remove('slot-0', 'slot-1', 'slot-2', 'slot-3');
+      el.classList.remove('slot-0', 'slot-1', 'slot-2');
       const fromEnd = all.length - 1 - i;
-      if (fromEnd === 0) el.classList.add('slot-0');
-      else if (fromEnd === 1) el.classList.add('slot-1');
-      else if (fromEnd === 2) el.classList.add('slot-2');
-      else el.classList.add('slot-3');
+      const srcPh = currentScene.phrases[idx - (all.length - 1 - i)];
+      if (fromEnd === 0) {
+        el.classList.add('slot-0');
+        el.style.fontFamily = phraseFrontFont(srcPh);
+      } else if (fromEnd === 1) {
+        el.classList.add('slot-1');
+        el.style.fontFamily = phraseBackFont(srcPh);
+      } else {
+        el.classList.add('slot-2');
+        el.style.fontFamily = phraseBackFont(srcPh);
+      }
     });
+    // удаляем невидимые (слот 2) через задержку
     all.forEach(el => {
-      if (el.classList.contains('slot-3')) setTimeout(() => el.remove(), 750);
+      if (el.classList.contains('slot-2')) {
+        setTimeout(() => el.remove(), 750);
+      }
     });
 
     if (ph.audio) {
       const audio = new Audio(ph.audio);
       audio.play().catch(() => {});
     }
+
     idx++;
-    playTimers.push(setTimeout(showNext, 2200));
+    // длительность: если задана — берём её, иначе 2.2 сек
+    const dur = (ph.dur && ph.dur > 0) ? ph.dur * 1000 : 2200;
+    if (idx < total) {
+      playTimers.push(setTimeout(showNext, dur));
+    }
   }
 
   applyEffect();
@@ -1036,8 +1224,43 @@ function stopPlaying() {
   if (currentScene) {
     renderPhrases();
     renderChoices();
+    renderBgDesc();
     applyEffect();
   }
+}
+
+/* ============================================================
+   СПИСОК ВСЕХ КНОПОК
+   ============================================================ */
+function openAllButtonsModal() {
+  if (!currentScene) return;
+  const list = document.getElementById('allButtonsList');
+  list.innerHTML = '';
+  if (currentScene.choices.length === 0) {
+    list.innerHTML = '<p style="color:#666;font-size:11px;">Нет кнопок</p>';
+  }
+  currentScene.choices.forEach((ch, i) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:5px;align-items:center;margin-bottom:5px;background:#1a1a22;padding:6px;border-radius:5px;';
+    row.innerHTML = `
+      <div style="width:16px;height:16px;border-radius:4px;background:${ch.bg || '#fff'};border:1px solid ${ch.borderColor || '#222'};flex-shrink:0;"></div>
+      <div style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ch.label)} <span style="color:#888;font-size:10px;">(${ch.x ?? 50}%, ${ch.y ?? 20}%)</span></div>
+      <button data-id="${ch.id}" data-act="edit" style="background:#3a3a44;color:#fff;border:none;border-radius:4px;padding:4px 7px;font-size:10px;">✏️</button>
+      <button data-id="${ch.id}" data-act="del" style="background:#6a3030;color:#fff;border:none;border-radius:4px;padding:4px 7px;font-size:10px;">🗑</button>
+    `;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      if (b.dataset.act === 'edit') { closeModal('allButtonsModal'); openChoiceModal(b.dataset.id); }
+      if (b.dataset.act === 'del') {
+        if (!confirm('Удалить кнопку?')) return;
+        currentScene.choices = currentScene.choices.filter(c => c.id !== b.dataset.id);
+        save(); renderChoices(); openAllButtonsModal();
+      }
+    };
+  });
+  document.getElementById('allButtonsModal').classList.remove('hidden');
 }
 
 /* ============================================================
@@ -1086,12 +1309,18 @@ function openPhraseModal(editId) {
       document.getElementById('phraseText').value = ph.text;
       document.getElementById('phraseSize').value = ph.size || 22;
       document.getElementById('phraseColor').value = ph.color || '#1a1a1a';
+      document.getElementById('phraseFontFront').value = ph.fontFront || 'system-ui, sans-serif';
+      document.getElementById('phraseFontBack').value = ph.fontBack || 'system-ui, sans-serif';
+      document.getElementById('phraseDur').value = ph.dur || 0;
       document.getElementById('audioStatus').textContent = ph.audio ? '✅ Аудио прикреплено' : '';
     }
   } else {
     document.getElementById('phraseText').value = '';
     document.getElementById('phraseSize').value = 22;
     document.getElementById('phraseColor').value = '#1a1a1a';
+    document.getElementById('phraseFontFront').value = 'system-ui, sans-serif';
+    document.getElementById('phraseFontBack').value = 'system-ui, sans-serif';
+    document.getElementById('phraseDur').value = 0;
   }
 }
 
@@ -1104,6 +1333,9 @@ function savePhrase() {
     text,
     size: parseInt(document.getElementById('phraseSize').value) || 22,
     color: document.getElementById('phraseColor').value,
+    fontFront: document.getElementById('phraseFontFront').value,
+    fontBack: document.getElementById('phraseFontBack').value,
+    dur: parseInt(document.getElementById('phraseDur').value) || 0,
     audio: null,
   };
   if (editingPhraseId) {
@@ -1276,25 +1508,12 @@ document.getElementById('btnBackHome').onclick = () => {
    НИЖНЯЯ ПАНЕЛЬ
    ============================================================ */
 document.getElementById('btnAddPhrase').onclick = () => openPhraseModal(null);
-document.getElementById('btnAddChoice').onclick = () => openChoiceModal(null);
-document.getElementById('btnAddNext').onclick = () => {
-  if (!currentScene) return;
-  const ns = newScene(currentScene.id);
-  currentScene.choices.push({
-    id: uid(),
-    label: '➡ Далее',
-    bg: '#ffffff',
-    textColor: '#1a1a1a',
-    borderColor: '#222222',
-    x: 50,
-    y: 12,
-    targetId: ns.id,
-  });
-  save();
-  renderChoices();
-};
+document.getElementById('btnAddChoice').onclick = () => openChoiceModal(null, 'choice');
+document.getElementById('btnAddNext').onclick = () => openChoiceModal(null, 'next');
 document.getElementById('btnEffects').onclick = openEffectModal;
+document.getElementById('btnBgDesc').onclick = openBgDescModal;
 document.getElementById('btnTexts').onclick = openTextsModal;
+document.getElementById('btnAllButtons').onclick = openAllButtonsModal;
 document.getElementById('btnSave').onclick = () => {
   if (currentScene) { currentScene.drawing = drawCv.toDataURL(); save(); }
   alert('Сохранено в браузере.');
@@ -1341,20 +1560,12 @@ document.getElementById('drawToolbar').classList.add('hidden');
 document.getElementById('bottomBar').classList.add('hidden');
 document.getElementById('canvasWrap').classList.add('hidden');
 
-/* При повороте экрана — пересоздать холст */
 window.addEventListener('resize', () => {
   if (currentScene && state.currentId && !document.getElementById('canvasWrap').classList.contains('hidden')) {
     const savedId = state.currentId;
     setTimeout(() => openScene(savedId), 120);
   }
 });
-
-/* Плавное обновление высоты для мобильных браузеров */
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', () => {
-    document.documentElement.style.setProperty('--vh', window.visualViewport.height + 'px');
-  });
-}
 </script>
 </body>
 </html>
