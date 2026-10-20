@@ -2,19 +2,33 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Редактор сцен</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #1a1a1f;
-    color: #e8e8e8;
-    overflow: hidden;
-    height: 100vh;
-  }
-  #app { display: flex; flex-direction: column; height: 100vh; }
 
+  html, body {
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    background: #1a1a1f;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #e8e8e8;
+    font-size: 12px;
+    overscroll-behavior: none;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    height: 100dvh;
+    width: 100%;
+  }
+
+  /* ===== ВЕРХНЯЯ ПАНЕЛЬ (кнопки прежнего размера) ===== */
   .toolbar {
     background: #2a2a32;
     padding: 6px;
@@ -22,7 +36,8 @@
     flex-wrap: wrap;
     gap: 4px;
     border-bottom: 1px solid #3a3a44;
-    font-size: 11px;
+    font-size: 12px;
+    flex-shrink: 0;
   }
   .toolbar button, .toolbar select, .toolbar input[type=color] {
     background: #3a3a44;
@@ -39,24 +54,29 @@
   .toolbar input[type=color] { padding: 2px; width: 34px; height: 30px; }
   .toolbar .group { display: flex; gap: 2px; align-items: center; }
 
+  /* ===== ХОЛСТ — уменьшенный масштаб ===== */
   #canvasWrap {
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 0;
     position: relative;
-    background: #111;
+    background: #0d0d10;
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 4px;
   }
   #phone {
     position: relative;
-    width: 100%;
-    height: 100%;
-    max-width: 500px;
-    max-height: 900px;
+    /* уменьшенный масштаб — с полями по бокам */
+    width: min(88vw, 380px);
+    height: min(72vh, 640px);
+    max-height: 100%;
     background: #fff;
     overflow: hidden;
-    box-shadow: 0 0 30px rgba(0,0,0,0.6);
+    box-shadow: 0 0 20px rgba(0,0,0,0.7);
+    border-radius: 6px;
+    flex-shrink: 0;
   }
   #sceneCanvas, #drawCanvas, #effectLayer {
     position: absolute;
@@ -68,7 +88,7 @@
   #drawCanvas { z-index: 2; touch-action: none; }
   #effectLayer { z-index: 3; pointer-events: none; }
 
-  /* ===== ТЕКСТОВЫЕ ФРАЗЫ (стек) ===== */
+  /* ===== ФРАЗЫ ===== */
   #phrasesLayer {
     position: absolute;
     inset: 0;
@@ -87,7 +107,6 @@
     white-space: pre-wrap;
     line-height: 1.25;
   }
-  /* слоты позиционирования: 0 = текущая (низ), 1 = под ней тусклая, 2 = над ней совсем тусклая, 3+ = исчезает */
   .phrase.slot-0 { opacity: 1; bottom: 14%; }
   .phrase.slot-1 { opacity: 0.35; bottom: 28%; }
   .phrase.slot-2 { opacity: 0.12; bottom: 40%; }
@@ -104,151 +123,170 @@
     position: absolute;
     pointer-events: auto;
     border: 2px solid #222;
-    border-radius: 14px;
-    padding: 12px 18px;
-    font-size: 15px;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
     transition: transform 0.1s;
     text-align: center;
-    min-width: 100px;
+    min-width: 80px;
+    max-width: 80%;
   }
-  .choiceBtn:active { transform: scale(0.97); }
+  .choiceBtn:active { transform: translateX(-50%) scale(0.96); }
 
-  /* Кнопка "Начать сцену" */
   #btnPlayScene {
     position: absolute;
     z-index: 6;
-    right: 12px;
-    bottom: 12px;
+    right: 8px;
+    bottom: 8px;
     background: #6a5acd;
     color: #fff;
     border: none;
     border-radius: 50%;
-    width: 56px;
-    height: 56px;
-    font-size: 22px;
+    width: 42px;
+    height: 42px;
+    font-size: 16px;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.4);
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  #btnPlayScene:active { transform: scale(0.93); }
+  #btnPlayScene:active { transform: scale(0.92); }
 
-  /* режим проигрывания: скрываем редакторские элементы */
   #phone.playing #drawCanvas { pointer-events: none; }
   #phone.playing #btnPlayScene { display: none; }
   #phone.playing #btnStopPlay { display: flex; }
   #btnStopPlay {
     position: absolute;
     z-index: 7;
-    right: 12px;
-    top: 12px;
+    right: 8px;
+    top: 8px;
     background: #c0504d;
     color: #fff;
     border: none;
     border-radius: 50%;
-    width: 42px;
-    height: 42px;
-    font-size: 18px;
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
     cursor: pointer;
     display: none;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.4);
   }
 
+  /* ===== НИЖНЯЯ ПАНЕЛЬ — гарантированно видна ===== */
   .bottomBar {
     background: #2a2a32;
     padding: 6px;
-    display: flex;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 4px;
-    flex-wrap: wrap;
     border-top: 1px solid #3a3a44;
     font-size: 11px;
+    flex-shrink: 0;
   }
   .bottomBar button {
     background: #3a3a44;
     color: #e8e8e8;
     border: 1px solid #4a4a55;
     border-radius: 6px;
-    padding: 8px 10px;
-    font-size: 12px;
+    padding: 8px 4px;
+    font-size: 11px;
     cursor: pointer;
-    flex: 1;
-    min-width: 70px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .bottomBar button:active { transform: scale(0.96); }
-  .bottomBar button.primary { background: #6a5acd; }
-  .bottomBar button.danger { background: #c0504d; }
+  .bottomBar button.primary { background: #6a5acd; border-color: #8a7aed; }
 
+  /* ===== ГЛАВНЫЙ ЭКРАН ===== */
   #homeScreen {
     position: fixed;
     inset: 0;
     background: #1a1a1f;
     z-index: 100;
-    padding: 16px;
+    padding: 12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     overflow-y: auto;
   }
-  #homeScreen h1 { font-size: 20px; margin-bottom: 12px; color: #b8a8ff; }
+  #homeScreen.hidden { display: none; }
+  #homeScreen h1 { font-size: 17px; margin-bottom: 10px; color: #b8a8ff; }
   #homeScreen h2 {
-    font-size: 14px; margin: 16px 0 8px; color: #a8a8b8;
+    font-size: 12px; margin: 14px 0 8px; color: #a8a8b8;
     text-transform: uppercase; letter-spacing: 1px;
   }
+  .homeActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .homeActions button {
+    background: #3a3a44; color: #fff; border: none; border-radius: 8px;
+    padding: 10px 8px; font-size: 12px; cursor: pointer;
+  }
+  .homeActions button.primary { background: #6a5acd; }
+  .homeActions button:active { transform: scale(0.97); }
+
   .sceneCard {
     background: #2a2a32;
     border: 1px solid #3a3a44;
     border-radius: 10px;
-    padding: 10px;
+    padding: 8px;
     margin-bottom: 8px;
     display: flex;
     align-items: center;
     gap: 8px;
   }
   .sceneCard .thumb {
-    width: 44px; height: 60px; background: #fff; border-radius: 6px;
+    width: 40px; height: 54px; background: #fff; border-radius: 5px;
     flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-    font-size: 20px; color: #999; overflow: hidden;
+    font-size: 18px; color: #999; overflow: hidden;
   }
   .sceneCard .thumb img { width: 100%; height: 100%; object-fit: cover; }
   .sceneCard .info { flex: 1; min-width: 0; }
-  .sceneCard .info .title { font-size: 13px; font-weight: 600; }
-  .sceneCard .info .meta { font-size: 11px; color: #888; margin-top: 2px; }
-  .sceneCard .actions { display: flex; gap: 4px; flex-wrap: wrap; }
+  .sceneCard .info .title { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sceneCard .info .meta { font-size: 10px; color: #888; margin-top: 2px; }
+  .sceneCard .actions { display: flex; gap: 3px; flex-shrink: 0; }
   .sceneCard .actions button {
     background: #3a3a44; color: #e8e8e8; border: 1px solid #4a4a55;
-    border-radius: 6px; padding: 5px 8px; font-size: 11px; cursor: pointer;
+    border-radius: 5px; padding: 5px 7px; font-size: 11px; cursor: pointer;
   }
   .sceneCard .actions button:active { transform: scale(0.95); }
   .sceneCard .actions .del { background: #6a3030; }
   .sceneCard .actions .edit { background: #4a6a30; }
 
+  /* ===== МОДАЛКИ ===== */
   .modal {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8);
     z-index: 200; display: flex; align-items: center; justify-content: center;
-    padding: 16px;
+    padding: 10px;
   }
   .modal.hidden { display: none; }
   .modal .box {
-    background: #2a2a32; border-radius: 14px; padding: 16px;
-    width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto;
+    background: #2a2a32; border-radius: 12px; padding: 12px;
+    width: 100%; max-width: 380px; max-height: 90vh; overflow-y: auto;
   }
-  .modal .box h3 { font-size: 16px; margin-bottom: 12px; color: #b8a8ff; }
-  .modal .box label { display: block; font-size: 12px; color: #a8a8b8; margin: 10px 0 4px; }
+  .modal .box h3 { font-size: 14px; margin-bottom: 10px; color: #b8a8ff; }
+  .modal .box label { display: block; font-size: 11px; color: #a8a8b8; margin: 8px 0 3px; }
   .modal .box input, .modal .box select, .modal .box textarea {
     width: 100%; background: #1a1a22; color: #e8e8e8;
-    border: 1px solid #4a4a55; border-radius: 6px; padding: 8px;
-    font-size: 13px; font-family: inherit;
+    border: 1px solid #4a4a55; border-radius: 6px; padding: 7px;
+    font-size: 12px; font-family: inherit;
   }
-  .modal .box textarea { min-height: 60px; resize: vertical; }
-  .modal .box input[type=color] { width: 100%; height: 40px; padding: 2px; }
+  .modal .box textarea { min-height: 50px; resize: vertical; }
+  .modal .box input[type=color] { width: 100%; height: 34px; padding: 2px; }
   .modal .box input[type=range] { padding: 0; }
-  .modal .box .row { display: flex; gap: 6px; margin-top: 12px; }
+  .modal .box .row { display: flex; gap: 5px; margin-top: 10px; }
   .modal .box .row button {
-    flex: 1; padding: 10px; border: none; border-radius: 8px;
-    font-size: 13px; cursor: pointer; background: #3a3a44; color: #e8e8e8;
+    flex: 1; padding: 9px; border: none; border-radius: 7px;
+    font-size: 12px; cursor: pointer; background: #3a3a44; color: #e8e8e8;
   }
   .modal .box .row button.ok { background: #6a5acd; }
   .modal .box .row button:active { transform: scale(0.97); }
@@ -256,6 +294,7 @@
     display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;
   }
   .modal .box .posGrid label { margin: 0; }
+
   .hidden { display: none !important; }
 
   #effectLayer.fade-dark { animation: fadeDark var(--dur, 3s) forwards; }
@@ -270,6 +309,7 @@
 <body>
 <div id="app">
 
+  <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
   <div class="toolbar" id="drawToolbar">
     <button id="btnBackHome">🏠</button>
     <div class="group">
@@ -291,9 +331,10 @@
     </select>
     <button id="btnUndo">↶</button>
     <button id="btnClearDraw">🗑</button>
-    <button id="btnImageBg">🖼 Фон</button>
+    <button id="btnImageBg">🖼</button>
   </div>
 
+  <!-- ХОЛСТ -->
   <div id="canvasWrap">
     <div id="phone">
       <canvas id="sceneCanvas"></canvas>
@@ -306,22 +347,25 @@
     </div>
   </div>
 
+  <!-- НИЖНЯЯ ПАНЕЛЬ -->
   <div class="bottomBar" id="bottomBar">
     <button id="btnAddPhrase">＋ Фраза</button>
     <button id="btnAddChoice">＋ Выбор</button>
     <button id="btnAddNext">＋ Далее</button>
     <button id="btnEffects">✨ Эффекты</button>
     <button id="btnTexts">📝 Тексты</button>
-    <button id="btnSave" class="primary">💾 Сохранить</button>
+    <button id="btnSave" class="primary">💾 Сохр.</button>
   </div>
 </div>
 
+<!-- ГЛАВНЫЙ ЭКРАН -->
 <div id="homeScreen">
   <h1>📖 Черновик игры</h1>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-    <button onclick="newScene(null)" style="background:#6a5acd;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;">＋ Новая сцена</button>
-    <button onclick="exportAll()" style="background:#3a3a44;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;">💾 Экспорт JSON</button>
-    <button onclick="document.getElementById('importFile').click()" style="background:#3a3a44;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;">📂 Импорт</button>
+  <div class="homeActions">
+    <button class="primary" onclick="newScene(null)">＋ Новая сцена</button>
+    <button onclick="exportAll()">💾 Экспорт</button>
+    <button onclick="document.getElementById('importFile').click()">📂 Импорт</button>
+    <button onclick="if(confirm('Удалить ВСЕ сцены?')){state.scenes=[];state.currentId=null;save();renderSceneList();}">🗑 Всё</button>
     <input type="file" id="importFile" accept=".json" class="hidden" onchange="importAll(event)">
   </div>
   <h2>Все сцены</h2>
@@ -340,12 +384,12 @@
     <input type="color" id="phraseColor" value="#1a1a1a">
     <label>Аудио</label>
     <div class="row">
-      <button id="btnRecAudio">🎙 Записать</button>
+      <button id="btnRecAudio">🎙 Запись</button>
       <button id="btnStopRec" class="hidden">⏹ Стоп</button>
-      <button id="btnLoadAudio">📁 Загрузить</button>
+      <button id="btnLoadAudio">📁 Файл</button>
       <input type="file" id="audioFile" accept="audio/*" class="hidden">
     </div>
-    <div id="audioStatus" style="font-size:11px;color:#888;margin-top:4px;"></div>
+    <div id="audioStatus" style="font-size:10px;color:#888;margin-top:4px;"></div>
     <div class="row">
       <button onclick="closeModal('phraseModal')">Отмена</button>
       <button class="ok" onclick="savePhrase()">Готово</button>
@@ -353,13 +397,13 @@
   </div>
 </div>
 
-<!-- МОДАЛКА ВЫБОРА (кнопки) -->
+<!-- МОДАЛКА КНОПКИ -->
 <div class="modal hidden" id="choiceModal">
   <div class="box">
     <h3>Кнопка выбора / Далее</h3>
     <label>Надпись на кнопке</label>
     <input type="text" id="choiceLabel" placeholder="Например: Пойти налево">
-    <label>Заливка кнопки</label>
+    <label>Заливка</label>
     <input type="color" id="choiceBg" value="#ffffff">
     <label>Цвет текста</label>
     <input type="color" id="choiceText" value="#1a1a1a">
@@ -369,19 +413,12 @@
     <select id="choiceTarget">
       <option value="new">— Новая пустая сцена —</option>
     </select>
-    <label>Позиция (в % от экрана)</label>
-    <div class="posGrid">
-      <div>
-        <label style="font-size:11px;">X (слева)</label>
-        <input type="range" id="choiceX" min="0" max="100" value="50">
-        <div id="choiceXVal" style="font-size:11px;color:#888;">50%</div>
-      </div>
-      <div>
-        <label style="font-size:11px;">Y (снизу)</label>
-        <input type="range" id="choiceY" min="0" max="100" value="20">
-        <div id="choiceYVal" style="font-size:11px;color:#888;">20%</div>
-      </div>
-    </div>
+    <label>Позиция X (слева, %)</label>
+    <input type="range" id="choiceX" min="0" max="100" value="50">
+    <div id="choiceXVal" style="font-size:10px;color:#888;">50%</div>
+    <label>Позиция Y (снизу, %)</label>
+    <input type="range" id="choiceY" min="0" max="100" value="20">
+    <div id="choiceYVal" style="font-size:10px;color:#888;">20%</div>
     <div class="row">
       <button onclick="closeModal('choiceModal')">Отмена</button>
       <button class="ok" onclick="saveChoice()">Готово</button>
@@ -423,7 +460,7 @@
 /* ============================================================
    МОДЕЛЬ
    ============================================================ */
-const STORAGE_KEY = 'game_draft_v2';
+const STORAGE_KEY = 'game_draft_v3';
 let state = { scenes: [], currentId: null };
 
 function uid() { return 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
@@ -475,7 +512,7 @@ function renderSceneList() {
   const list = document.getElementById('sceneList');
   list.innerHTML = '';
   if (state.scenes.length === 0) {
-    list.innerHTML = '<p style="color:#666;font-size:13px;">Пока нет сцен. Создайте первую.</p>';
+    list.innerHTML = '<p style="color:#666;font-size:12px;">Пока нет сцен. Создайте первую.</p>';
     return;
   }
   state.scenes.forEach(s => {
@@ -563,8 +600,8 @@ function openScene(id) {
   const dpr = window.devicePixelRatio || 1;
 
   [sceneCv, drawCv].forEach(cv => {
-    cv.width = rect.width * dpr;
-    cv.height = rect.height * dpr;
+    cv.width = Math.max(1, Math.floor(rect.width * dpr));
+    cv.height = Math.max(1, Math.floor(rect.height * dpr));
     cv.style.width = rect.width + 'px';
     cv.style.height = rect.height + 'px';
   });
@@ -620,8 +657,8 @@ const drawCv = document.getElementById('drawCanvas');
 
 function pushHistory() {
   if (!ctxDraw) return;
-  drawHistory.push(drawCv.toDataURL());
-  if (drawHistory.length > 25) drawHistory.shift();
+  try { drawHistory.push(drawCv.toDataURL()); } catch(e) {}
+  if (drawHistory.length > 20) drawHistory.shift();
 }
 
 function restoreFromHistory() {
@@ -733,6 +770,7 @@ function floodFill(p) {
   const x = Math.floor(p.x * dpr);
   const y = Math.floor(p.y * dpr);
   const w = cv.width, h = cv.height;
+  if (x < 0 || y < 0 || x >= w || y >= h) return;
   const imgData = ctxDraw.getImageData(0, 0, w, h);
   const data = imgData.data;
   const idx = (y * w + x) * 4;
@@ -764,14 +802,13 @@ function floodFill(p) {
 }
 
 /* ============================================================
-   ФРАЗЫ: рендер + слоты затухания
+   ФРАЗЫ
    ============================================================ */
 function renderPhrases() {
   const layer = document.getElementById('phrasesLayer');
   layer.innerHTML = '';
   if (!currentScene) return;
-  // в редакторе показываем ВСЕ фразы в стеке (как в финале)
-  currentScene.phrases.forEach((ph, i) => {
+  currentScene.phrases.forEach(ph => {
     const div = document.createElement('div');
     div.className = 'phrase';
     div.dataset.id = ph.id;
@@ -783,24 +820,11 @@ function renderPhrases() {
   updatePhraseSlots(currentScene.phrases.length);
 }
 
-/**
- * Раскладывает фразы по слотам затухания.
- * visibleCount — сколько фраз реально «в стопке».
- * Слот 0 — текущая (яркая, внизу).
- * Слот 1 — под ней тусклая.
- * Слот 2 — над ней совсем тусклая.
- * Слот 3+ — невидима (уходит вверх и исчезает).
- *
- * Логика «на 3-й фразе под ней две тусклые»:
- * когда видны фразы 1,2,3 — фраза 3 = слот 0, фраза 2 = слот 1, фраза 1 = слот 2.
- * На 4-й фразе фраза 1 уходит в слот 3 (исчезает), фразы 2,3,4 занимают слоты 2,1,0.
- */
 function updatePhraseSlots(visibleCount) {
   const els = Array.from(document.querySelectorAll('#phrasesLayer .phrase'));
   const n = visibleCount;
   els.forEach((el, i) => {
     el.classList.remove('slot-0', 'slot-1', 'slot-2', 'slot-3');
-    // индекс с конца: 0 = последняя (текущая), 1 = предпоследняя, ...
     const fromEnd = n - 1 - i;
     if (fromEnd === 0) el.classList.add('slot-0');
     else if (fromEnd === 1) el.classList.add('slot-1');
@@ -810,7 +834,7 @@ function updatePhraseSlots(visibleCount) {
 }
 
 /* ============================================================
-   КНОПКИ / ВЫБОРЫ: с позицией, цветом, заливкой
+   КНОПКИ / ВЫБОРЫ
    ============================================================ */
 function renderChoices() {
   const layer = document.getElementById('choicesLayer');
@@ -827,8 +851,6 @@ function renderChoices() {
     btn.style.color = ch.textColor || '#1a1a1a';
     btn.style.borderColor = ch.borderColor || '#222222';
     btn.onclick = () => {
-      if (playing) { goToTarget(ch); return; }
-      // в редакторе: открываем целевую сцену
       if (ch.targetId) {
         const t = findScene(ch.targetId);
         if (t) openScene(t.id);
@@ -844,23 +866,12 @@ function renderChoices() {
   });
 }
 
-function goToTarget(ch) {
-  if (!ch.targetId) {
-    const ns = newScene(currentScene.id);
-    ch.targetId = ns.id;
-    save();
-  }
-  const t = findScene(ch.targetId);
-  if (t) openScene(t.id);
-}
-
 let editingChoiceId = null;
 
 function openChoiceModal(editId) {
   if (!currentScene) return;
   editingChoiceId = editId || null;
-  const modal = document.getElementById('choiceModal');
-  modal.classList.remove('hidden');
+  document.getElementById('choiceModal').classList.remove('hidden');
   const sel = document.getElementById('choiceTarget');
   sel.innerHTML = '<option value="new">— Новая пустая сцена —</option>';
   state.scenes.forEach(s => {
@@ -871,7 +882,6 @@ function openChoiceModal(editId) {
       sel.appendChild(o);
     }
   });
-
   if (editId) {
     const ch = currentScene.choices.find(c => c.id === editId);
     if (ch) {
@@ -883,8 +893,7 @@ function openChoiceModal(editId) {
       document.getElementById('choiceY').value = ch.y ?? 20;
       document.getElementById('choiceXVal').textContent = (ch.x ?? 50) + '%';
       document.getElementById('choiceYVal').textContent = (ch.y ?? 20) + '%';
-      if (ch.targetId) sel.value = ch.targetId;
-      else sel.value = 'new';
+      sel.value = ch.targetId || 'new';
     }
   } else {
     document.getElementById('choiceLabel').value = '';
@@ -967,7 +976,7 @@ function applyEffect() {
 }
 
 /* ============================================================
-   ПРОИГРЫВАНИЕ СЦЕНЫ (кнопка ▶)
+   ПРОИГРЫВАНИЕ
    ============================================================ */
 function startPlaying() {
   if (!currentScene || playing) return;
@@ -985,10 +994,7 @@ function startPlaying() {
 
   function showNext() {
     if (!playing) return;
-    if (idx >= total) {
-      // все фразы показаны — оставляем финальную картинку
-      return;
-    }
+    if (idx >= total) return;
     const ph = currentScene.phrases[idx];
     const div = document.createElement('div');
     div.className = 'phrase slot-0';
@@ -997,7 +1003,6 @@ function startPlaying() {
     div.style.color = ph.color || '#1a1a1a';
     layer.appendChild(div);
 
-    // пересчитываем слоты для всех видимых
     const all = Array.from(layer.querySelectorAll('.phrase'));
     all.forEach((el, i) => {
       el.classList.remove('slot-0', 'slot-1', 'slot-2', 'slot-3');
@@ -1007,27 +1012,18 @@ function startPlaying() {
       else if (fromEnd === 2) el.classList.add('slot-2');
       else el.classList.add('slot-3');
     });
-
-    // удаляем исчезнувшие
     all.forEach(el => {
-      if (el.classList.contains('slot-3')) {
-        setTimeout(() => el.remove(), 750);
-      }
+      if (el.classList.contains('slot-3')) setTimeout(() => el.remove(), 750);
     });
 
-    // аудио
     if (ph.audio) {
       const audio = new Audio(ph.audio);
       audio.play().catch(() => {});
     }
-
     idx++;
-    // интервал появления: 1.8с по умолчанию, или до конца аудио
-    const delay = 2200;
-    playTimers.push(setTimeout(showNext, delay));
+    playTimers.push(setTimeout(showNext, 2200));
   }
 
-  // эффекты
   applyEffect();
   showNext();
 }
@@ -1052,15 +1048,15 @@ function openTextsModal() {
   const list = document.getElementById('textsList');
   list.innerHTML = '';
   if (currentScene.phrases.length === 0) {
-    list.innerHTML = '<p style="color:#666;font-size:13px;">Нет фраз</p>';
+    list.innerHTML = '<p style="color:#666;font-size:11px;">Нет фраз</p>';
   }
   currentScene.phrases.forEach(ph => {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;background:#1a1a22;padding:6px;border-radius:6px;';
+    row.style.cssText = 'display:flex;gap:5px;align-items:center;margin-bottom:5px;background:#1a1a22;padding:5px;border-radius:5px;';
     row.innerHTML = `
-      <div style="flex:1;font-size:13px;">${escapeHtml(ph.text)} ${ph.audio ? '🎙' : ''}</div>
-      <button data-id="${ph.id}" data-act="edit" style="background:#3a3a44;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:11px;">✏️</button>
-      <button data-id="${ph.id}" data-act="del" style="background:#6a3030;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:11px;">🗑</button>
+      <div style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ph.text)} ${ph.audio ? '🎙' : ''}</div>
+      <button data-id="${ph.id}" data-act="edit" style="background:#3a3a44;color:#fff;border:none;border-radius:4px;padding:4px 7px;font-size:10px;">✏️</button>
+      <button data-id="${ph.id}" data-act="del" style="background:#6a3030;color:#fff;border:none;border-radius:4px;padding:4px 7px;font-size:10px;">🗑</button>
     `;
     list.appendChild(row);
   });
@@ -1305,7 +1301,7 @@ document.getElementById('btnSave').onclick = () => {
 };
 
 /* ============================================================
-   МОДАЛКИ / ЗАКРЫТИЕ
+   МОДАЛКИ
    ============================================================ */
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
@@ -1314,7 +1310,6 @@ document.getElementById('btnStopRec').onclick = stopRecording;
 document.getElementById('btnLoadAudio').onclick = () => document.getElementById('audioFile').click();
 document.getElementById('audioFile').onchange = loadAudioFile;
 
-// ползунки позиции кнопки
 document.getElementById('choiceX').oninput = e => {
   document.getElementById('choiceXVal').textContent = e.target.value + '%';
 };
@@ -1334,9 +1329,6 @@ drawCv.addEventListener('touchmove', moveDraw, { passive: false });
 drawCv.addEventListener('touchend', endDraw);
 drawCv.addEventListener('touchcancel', endDraw);
 
-/* ============================================================
-   КНОПКА ▶ / ⏹
-   ============================================================ */
 document.getElementById('btnPlayScene').onclick = startPlaying;
 document.getElementById('btnStopPlay').onclick = stopPlaying;
 
@@ -1348,6 +1340,21 @@ renderSceneList();
 document.getElementById('drawToolbar').classList.add('hidden');
 document.getElementById('bottomBar').classList.add('hidden');
 document.getElementById('canvasWrap').classList.add('hidden');
+
+/* При повороте экрана — пересоздать холст */
+window.addEventListener('resize', () => {
+  if (currentScene && state.currentId && !document.getElementById('canvasWrap').classList.contains('hidden')) {
+    const savedId = state.currentId;
+    setTimeout(() => openScene(savedId), 120);
+  }
+});
+
+/* Плавное обновление высоты для мобильных браузеров */
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    document.documentElement.style.setProperty('--vh', window.visualViewport.height + 'px');
+  });
+}
 </script>
 </body>
 </html>
