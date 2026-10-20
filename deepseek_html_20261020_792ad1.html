@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Редактор сцен</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #1a1a1f;
+    color: #e8e8e8;
+    overflow: hidden;
+    height: 100vh;
+  }
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  .toolbar {
+    background: #2a2a32;
+    padding: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    border-bottom: 1px solid #3a3a44;
+    font-size: 11px;
+  }
+  .toolbar button, .toolbar select, .toolbar input[type=color] {
+    background: #3a3a44;
+    color: #e8e8e8;
+    border: 1px solid #4a4a55;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .toolbar button.active { background: #6a5acd; border-color: #8a7aed; }
+  .toolbar button:active { transform: scale(0.95); }
+  .toolbar input[type=color] { padding: 2px; width: 34px; height: 30px; }
+  .toolbar .group { display: flex; gap: 2px; align-items: center; }
+
+  #canvasWrap {
+    flex: 1;
+    position: relative;
+    background: #111;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #phone {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    max-width: 500px;
+    max-height: 900px;
+    background: #fff;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.6);
+  }
+  #sceneCanvas, #drawCanvas, #effectLayer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  #sceneCanvas { z-index: 1; }
+  #drawCanvas { z-index: 2; touch-action: none; }
+  #effectLayer { z-index: 3; pointer-events: none; }
+
+  /* ===== ТЕКСТОВЫЕ ФРАЗЫ (стек) ===== */
+  #phrasesLayer {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .phrase {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 88%;
+    text-align: center;
+    font-weight: 600;
+    transition: opacity 0.7s ease, bottom 0.7s ease, font-size 0.7s ease, color 0.7s ease;
+    white-space: pre-wrap;
+    line-height: 1.25;
+  }
+  /* слоты позиционирования: 0 = текущая (низ), 1 = под ней тусклая, 2 = над ней совсем тусклая, 3+ = исчезает */
+  .phrase.slot-0 { opacity: 1; bottom: 14%; }
+  .phrase.slot-1 { opacity: 0.35; bottom: 28%; }
+  .phrase.slot-2 { opacity: 0.12; bottom: 40%; }
+  .phrase.slot-3 { opacity: 0; bottom: 50%; }
+
+  /* ===== КНОПКИ В СЦЕНЕ ===== */
+  #choicesLayer {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .choiceBtn {
+    position: absolute;
+    pointer-events: auto;
+    border: 2px solid #222;
+    border-radius: 14px;
+    padding: 12px 18px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    transition: transform 0.1s;
+    text-align: center;
+    min-width: 100px;
+  }
+  .choiceBtn:active { transform: scale(0.97); }
+
+  /* Кнопка "Начать сцену" */
+  #btnPlayScene {
+    position: absolute;
+    z-index: 6;
+    right: 12px;
+    bottom: 12px;
+    background: #6a5acd;
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 56px;
+    height: 56px;
+    font-size: 22px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #btnPlayScene:active { transform: scale(0.93); }
+
+  /* режим проигрывания: скрываем редакторские элементы */
+  #phone.playing #drawCanvas { pointer-events: none; }
+  #phone.playing #btnPlayScene { display: none; }
+  #phone.playing #btnStopPlay { display: flex; }
+  #btnStopPlay {
+    position: absolute;
+    z-index: 7;
+    right: 12px;
+    top: 12px;
+    background: #c0504d;
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 42px;
+    height: 42px;
+    font-size: 18px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+
+  .bottomBar {
+    background: #2a2a32;
+    padding: 6px;
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    border-top: 1px solid #3a3a44;
+    font-size: 11px;
+  }
+  .bottomBar button {
+    background: #3a3a44;
+    color: #e8e8e8;
+    border: 1px solid #4a4a55;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    flex: 1;
+    min-width: 70px;
+  }
+  .bottomBar button:active { transform: scale(0.96); }
+  .bottomBar button.primary { background: #6a5acd; }
+  .bottomBar button.danger { background: #c0504d; }
+
+  #homeScreen {
+    position: fixed;
+    inset: 0;
+    background: #1a1a1f;
+    z-index: 100;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  #homeScreen h1 { font-size: 20px; margin-bottom: 12px; color: #b8a8ff; }
+  #homeScreen h2 {
+    font-size: 14px; margin: 16px 0 8px; color: #a8a8b8;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .sceneCard {
+    background: #2a2a32;
+    border: 1px solid #3a3a44;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sceneCard .thumb {
+    width: 44px; height: 60px; background: #fff; border-radius: 6px;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: #999; overflow: hidden;
+  }
+  .sceneCard .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .sceneCard .info { flex: 1; min-width: 0; }
+  .sceneCard .info .title { font-size: 13px; font-weight: 600; }
+  .sceneCard .info .meta { font-size: 11px; color: #888; margin-top: 2px; }
+  .sceneCard .actions { display: flex; gap: 4px; flex-wrap: wrap; }
+  .sceneCard .actions button {
+    background: #3a3a44; color: #e8e8e8; border: 1px solid #4a4a55;
+    border-radius: 6px; padding: 5px 8px; font-size: 11px; cursor: pointer;
+  }
+  .sceneCard .actions button:active { transform: scale(0.95); }
+  .sceneCard .actions .del { background: #6a3030; }
+  .sceneCard .actions .edit { background: #4a6a30; }
+
+  .modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    z-index: 200; display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .modal.hidden { display: none; }
+  .modal .box {
+    background: #2a2a32; border-radius: 14px; padding: 16px;
+    width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto;
+  }
+  .modal .box h3 { font-size: 16px; margin-bottom: 12px; color: #b8a8ff; }
+  .modal .box label { display: block; font-size: 12px; color: #a8a8b8; margin: 10px 0 4px; }
+  .modal .box input, .modal .box select, .modal .box textarea {
+    width: 100%; background: #1a1a22; color: #e8e8e8;
+    border: 1px solid #4a4a55; border-radius: 6px; padding: 8px;
+    font-size: 13px; font-family: inherit;
+  }
+  .modal .box textarea { min-height: 60px; resize: vertical; }
+  .modal .box input[type=color] { width: 100%; height: 40px; padding: 2px; }
+  .modal .box input[type=range] { padding: 0; }
+  .modal .box .row { display: flex; gap: 6px; margin-top: 12px; }
+  .modal .box .row button {
+    flex: 1; padding: 10px; border: none; border-radius: 8px;
+    font-size: 13px; cursor: pointer; background: #3a3a44; color: #e8e8e8;
+  }
+  .modal .box .row button.ok { background: #6a5acd; }
+  .modal .box .row button:active { transform: scale(0.97); }
+  .modal .box .posGrid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;
+  }
+  .modal .box .posGrid label { margin: 0; }
+  .hidden { display: none !important; }
+
+  #effectLayer.fade-dark { animation: fadeDark var(--dur, 3s) forwards; }
+  #effectLayer.blink { animation: blinkEffect var(--dur, 3s) infinite; }
+  @keyframes fadeDark { from { background: transparent; } to { background: rgba(0,0,0,0.95); } }
+  @keyframes blinkEffect {
+    0%, 100% { background: transparent; }
+    50% { background: rgba(0,0,0,0.9); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="toolbar" id="drawToolbar">
+    <button id="btnBackHome">🏠</button>
+    <div class="group">
+      <button class="tool" data-tool="brush" id="toolBrush">✏️</button>
+      <button class="tool" data-tool="eraser" id="toolEraser">🧽</button>
+      <button class="tool" data-tool="fill" id="toolFill">🪣</button>
+      <button class="tool" data-tool="rect" id="toolRect">▭</button>
+      <button class="tool" data-tool="circle" id="toolCircle">◯</button>
+      <button class="tool" data-tool="line" id="toolLine">╱</button>
+    </div>
+    <input type="color" id="colorPick" value="#222222" title="Цвет">
+    <select id="sizePick">
+      <option value="2">2px</option>
+      <option value="5">5px</option>
+      <option value="10" selected>10px</option>
+      <option value="20">20px</option>
+      <option value="40">40px</option>
+      <option value="80">80px</option>
+    </select>
+    <button id="btnUndo">↶</button>
+    <button id="btnClearDraw">🗑</button>
+    <button id="btnImageBg">🖼 Фон</button>
+  </div>
+
+  <div id="canvasWrap">
+    <div id="phone">
+      <canvas id="sceneCanvas"></canvas>
+      <canvas id="drawCanvas"></canvas>
+      <div id="effectLayer"></div>
+      <div id="phrasesLayer"></div>
+      <div id="choicesLayer"></div>
+      <button id="btnPlayScene" title="Начать сцену">▶</button>
+      <button id="btnStopPlay" title="Остановить">⏹</button>
+    </div>
+  </div>
+
+  <div class="bottomBar" id="bottomBar">
+    <button id="btnAddPhrase">＋ Фраза</button>
+    <button id="btnAddChoice">＋ Выбор</button>
+    <button id="btnAddNext">＋ Далее</button>
+    <button id="btnEffects">✨ Эффекты</button>
+    <button id="btnTexts">📝 Тексты</button>
+    <button id="btnSave" class="primary">💾 Сохранить</button>
+  </div>
+</div>
+
+<div id="homeScreen">
+  <h1>📖 Черновик игры</h1>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+    <button onclick="newScene(null)" style="background:#6a5acd;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;">＋ Новая сцена</button>
+    <button onclick="exportAll()" style="background:#3a3a44;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;">💾 Экспорт JSON</button>
+    <button onclick="document.getElementById('importFile').click()" style="background:#3a3a44;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;">📂 Импорт</button>
+    <input type="file" id="importFile" accept=".json" class="hidden" onchange="importAll(event)">
+  </div>
+  <h2>Все сцены</h2>
+  <div id="sceneList"></div>
+</div>
+
+<!-- МОДАЛКА ФРАЗЫ -->
+<div class="modal hidden" id="phraseModal">
+  <div class="box">
+    <h3>Текст фразы</h3>
+    <label>Текст</label>
+    <textarea id="phraseText" placeholder="Введите фразу..."></textarea>
+    <label>Размер шрифта (px)</label>
+    <input type="number" id="phraseSize" value="22" min="10" max="60">
+    <label>Цвет</label>
+    <input type="color" id="phraseColor" value="#1a1a1a">
+    <label>Аудио</label>
+    <div class="row">
+      <button id="btnRecAudio">🎙 Записать</button>
+      <button id="btnStopRec" class="hidden">⏹ Стоп</button>
+      <button id="btnLoadAudio">📁 Загрузить</button>
+      <input type="file" id="audioFile" accept="audio/*" class="hidden">
+    </div>
+    <div id="audioStatus" style="font-size:11px;color:#888;margin-top:4px;"></div>
+    <div class="row">
+      <button onclick="closeModal('phraseModal')">Отмена</button>
+      <button class="ok" onclick="savePhrase()">Готово</button>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛКА ВЫБОРА (кнопки) -->
+<div class="modal hidden" id="choiceModal">
+  <div class="box">
+    <h3>Кнопка выбора / Далее</h3>
+    <label>Надпись на кнопке</label>
+    <input type="text" id="choiceLabel" placeholder="Например: Пойти налево">
+    <label>Заливка кнопки</label>
+    <input type="color" id="choiceBg" value="#ffffff">
+    <label>Цвет текста</label>
+    <input type="color" id="choiceText" value="#1a1a1a">
+    <label>Цвет рамки</label>
+    <input type="color" id="choiceBorder" value="#222222">
+    <label>Куда ведёт</label>
+    <select id="choiceTarget">
+      <option value="new">— Новая пустая сцена —</option>
+    </select>
+    <label>Позиция (в % от экрана)</label>
+    <div class="posGrid">
+      <div>
+        <label style="font-size:11px;">X (слева)</label>
+        <input type="range" id="choiceX" min="0" max="100" value="50">
+        <div id="choiceXVal" style="font-size:11px;color:#888;">50%</div>
+      </div>
+      <div>
+        <label style="font-size:11px;">Y (снизу)</label>
+        <input type="range" id="choiceY" min="0" max="100" value="20">
+        <div id="choiceYVal" style="font-size:11px;color:#888;">20%</div>
+      </div>
+    </div>
+    <div class="row">
+      <button onclick="closeModal('choiceModal')">Отмена</button>
+      <button class="ok" onclick="saveChoice()">Готово</button>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛКА ЭФФЕКТОВ -->
+<div class="modal hidden" id="effectModal">
+  <div class="box">
+    <h3>Эффекты листа</h3>
+    <label>Тип эффекта</label>
+    <select id="effectType">
+      <option value="none">Нет</option>
+      <option value="fade-dark">Постепенное затемнение</option>
+      <option value="blink">Моргание</option>
+    </select>
+    <label>Длительность (сек)</label>
+    <input type="number" id="effectDur" value="3" min="1" max="30">
+    <div class="row">
+      <button onclick="closeModal('effectModal')">Отмена</button>
+      <button class="ok" onclick="saveEffect()">Готово</button>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛКА ТЕКСТОВ -->
+<div class="modal hidden" id="textsModal">
+  <div class="box">
+    <h3>Фразы на листе</h3>
+    <div id="textsList"></div>
+    <div class="row">
+      <button onclick="closeModal('textsModal')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   МОДЕЛЬ
+   ============================================================ */
+const STORAGE_KEY = 'game_draft_v2';
+let state = { scenes: [], currentId: null };
+
+function uid() { return 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+function newScene(parentId) {
+  const s = {
+    id: uid(),
+    title: 'Сцена ' + (state.scenes.length + 1),
+    phrases: [],
+    choices: [],
+    effect: { type: 'none', dur: 3 },
+    drawing: null,
+    bgImage: null,
+    bgColor: '#ffffff',
+    parentId: parentId || null,
+  };
+  state.scenes.push(s);
+  save();
+  renderSceneList();
+  return s;
+}
+
+function findScene(id) { return state.scenes.find(s => s.id === id); }
+
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch(e) { console.warn('save error', e); }
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      state.scenes = d.scenes || [];
+      state.currentId = d.currentId;
+    }
+  } catch(e) { console.warn(e); }
+}
+
+function escapeHtml(t) {
+  return String(t).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ============================================================
+   ГЛАВНЫЙ ЭКРАН
+   ============================================================ */
+function renderSceneList() {
+  const list = document.getElementById('sceneList');
+  list.innerHTML = '';
+  if (state.scenes.length === 0) {
+    list.innerHTML = '<p style="color:#666;font-size:13px;">Пока нет сцен. Создайте первую.</p>';
+    return;
+  }
+  state.scenes.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'sceneCard';
+    const thumb = s.bgImage
+      ? `<img src="${s.bgImage}">`
+      : (s.drawing ? `<img src="${s.drawing}">` : '📄');
+    card.innerHTML = `
+      <div class="thumb">${thumb}</div>
+      <div class="info">
+        <div class="title">${escapeHtml(s.title)}</div>
+        <div class="meta">${s.phrases.length} фраз · ${s.choices.length} кнопок ${s.parentId ? '· 🌿' : '· 🏠'}</div>
+      </div>
+      <div class="actions">
+        <button class="edit" data-act="edit" data-id="${s.id}">✏️</button>
+        <button data-act="copy" data-id="${s.id}">⧉</button>
+        <button class="del" data-act="del" data-id="${s.id}">🗑</button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+  list.querySelectorAll('button[data-act]').forEach(b => {
+    b.onclick = () => {
+      const id = b.dataset.id;
+      if (b.dataset.act === 'edit') openScene(id);
+      if (b.dataset.act === 'copy') copyScene(id);
+      if (b.dataset.act === 'del') deleteScene(id);
+    };
+  });
+}
+
+function copyScene(id) {
+  const src = findScene(id);
+  if (!src) return;
+  const copy = JSON.parse(JSON.stringify(src));
+  copy.id = uid();
+  copy.title = src.title + ' (копия)';
+  copy.phrases = copy.phrases.map(p => ({...p, id: uid()}));
+  copy.choices = copy.choices.map(c => ({...c, id: uid(), targetId: null}));
+  state.scenes.push(copy);
+  save();
+  renderSceneList();
+}
+
+function deleteScene(id) {
+  if (!confirm('Удалить сцену?')) return;
+  state.scenes = state.scenes.filter(s => s.id !== id);
+  state.scenes.forEach(s => {
+    s.choices = s.choices.filter(c => c.targetId !== id);
+    if (s.parentId === id) s.parentId = null;
+  });
+  save();
+  renderSceneList();
+}
+
+/* ============================================================
+   ОТКРЫТИЕ СЦЕНЫ
+   ============================================================ */
+let ctxScene, ctxDraw;
+let currentScene = null;
+let drawHistory = [];
+let currentTool = 'brush';
+let isDrawing = false;
+let startPoint = null;
+let lastPoint = null;
+let playing = false;
+let playTimers = [];
+
+function openScene(id) {
+  const s = findScene(id);
+  if (!s) return;
+  state.currentId = id;
+  currentScene = s;
+  stopPlaying();
+  document.getElementById('homeScreen').classList.add('hidden');
+  document.getElementById('drawToolbar').classList.remove('hidden');
+  document.getElementById('bottomBar').classList.remove('hidden');
+  document.getElementById('canvasWrap').classList.remove('hidden');
+
+  const phone = document.getElementById('phone');
+  const sceneCv = document.getElementById('sceneCanvas');
+  const drawCv = document.getElementById('drawCanvas');
+  const rect = phone.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+
+  [sceneCv, drawCv].forEach(cv => {
+    cv.width = rect.width * dpr;
+    cv.height = rect.height * dpr;
+    cv.style.width = rect.width + 'px';
+    cv.style.height = rect.height + 'px';
+  });
+
+  ctxScene = sceneCv.getContext('2d');
+  ctxDraw = drawCv.getContext('2d');
+  ctxScene.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctxDraw.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  drawHistory = [];
+  if (s.drawing) {
+    const img = new Image();
+    img.onload = () => {
+      ctxDraw.clearRect(0, 0, rect.width, rect.height);
+      ctxDraw.drawImage(img, 0, 0, rect.width, rect.height);
+      pushHistory();
+    };
+    img.src = s.drawing;
+  } else {
+    pushHistory();
+  }
+
+  renderSceneBackground();
+  renderPhrases();
+  renderChoices();
+  applyEffect();
+  updateToolUI();
+  save();
+}
+
+/* ============================================================
+   ФОН
+   ============================================================ */
+function renderSceneBackground() {
+  if (!currentScene || !ctxScene) return;
+  const cv = document.getElementById('sceneCanvas');
+  const w = cv.width / (window.devicePixelRatio || 1);
+  const h = cv.height / (window.devicePixelRatio || 1);
+  ctxScene.clearRect(0, 0, w, h);
+  ctxScene.fillStyle = currentScene.bgColor || '#fff';
+  ctxScene.fillRect(0, 0, w, h);
+  if (currentScene.bgImage) {
+    const img = new Image();
+    img.onload = () => ctxScene.drawImage(img, 0, 0, w, h);
+    img.src = currentScene.bgImage;
+  }
+}
+
+/* ============================================================
+   РИСОВАНИЕ
+   ============================================================ */
+const drawCv = document.getElementById('drawCanvas');
+
+function pushHistory() {
+  if (!ctxDraw) return;
+  drawHistory.push(drawCv.toDataURL());
+  if (drawHistory.length > 25) drawHistory.shift();
+}
+
+function restoreFromHistory() {
+  const data = drawHistory[drawHistory.length - 1];
+  if (!data) return;
+  const img = new Image();
+  img.onload = () => {
+    const w = drawCv.width / (window.devicePixelRatio || 1);
+    const h = drawCv.height / (window.devicePixelRatio || 1);
+    ctxDraw.clearRect(0, 0, w, h);
+    ctxDraw.drawImage(img, 0, 0, w, h);
+    applyStrokeStyle();
+  };
+  img.src = data;
+}
+
+function getPos(e) {
+  const r = drawCv.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - r.left, y: t.clientY - r.top };
+}
+
+function startDraw(e) {
+  if (!currentScene || playing) return;
+  e.preventDefault();
+  const p = getPos(e);
+  isDrawing = true;
+  startPoint = p;
+  lastPoint = p;
+
+  if (currentTool === 'fill') {
+    floodFill(p);
+    isDrawing = false;
+    pushHistory();
+    if (currentScene) { currentScene.drawing = drawCv.toDataURL(); save(); }
+    return;
+  }
+  applyStrokeStyle();
+  if (currentTool === 'brush' || currentTool === 'eraser') {
+    ctxDraw.beginPath();
+    ctxDraw.moveTo(p.x, p.y);
+    ctxDraw.lineTo(p.x + 0.01, p.y + 0.01);
+    ctxDraw.stroke();
+  }
+}
+
+function moveDraw(e) {
+  if (!isDrawing || !currentScene || playing) return;
+  e.preventDefault();
+  const p = getPos(e);
+
+  if (currentTool === 'brush' || currentTool === 'eraser') {
+    ctxDraw.lineTo(p.x, p.y);
+    ctxDraw.stroke();
+    lastPoint = p;
+  } else if (currentTool === 'rect' || currentTool === 'circle' || currentTool === 'line') {
+    restoreFromHistory();
+    applyStrokeStyle();
+    drawShape(currentTool, startPoint, p);
+    lastPoint = p;
+  }
+}
+
+function drawShape(tool, a, b) {
+  if (tool === 'rect') {
+    ctxDraw.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+  } else if (tool === 'circle') {
+    const r = Math.hypot(b.x - a.x, b.y - a.y);
+    ctxDraw.beginPath();
+    ctxDraw.arc(a.x, a.y, r, 0, Math.PI * 2);
+    ctxDraw.stroke();
+  } else if (tool === 'line') {
+    ctxDraw.beginPath();
+    ctxDraw.moveTo(a.x, a.y);
+    ctxDraw.lineTo(b.x, b.y);
+    ctxDraw.stroke();
+  }
+}
+
+function endDraw() {
+  if (!isDrawing) return;
+  isDrawing = false;
+  if (currentTool === 'rect' || currentTool === 'circle' || currentTool === 'line') {
+    const p = lastPoint || startPoint;
+    restoreFromHistory();
+    applyStrokeStyle();
+    drawShape(currentTool, startPoint, p);
+  }
+  pushHistory();
+  if (currentScene) {
+    currentScene.drawing = drawCv.toDataURL();
+    save();
+  }
+}
+
+function applyStrokeStyle() {
+  const color = document.getElementById('colorPick').value;
+  const size = parseInt(document.getElementById('sizePick').value);
+  ctxDraw.strokeStyle = color;
+  ctxDraw.lineWidth = size;
+  ctxDraw.lineCap = 'round';
+  ctxDraw.lineJoin = 'round';
+  ctxDraw.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
+}
+
+function floodFill(p) {
+  const cv = drawCv;
+  const dpr = window.devicePixelRatio || 1;
+  const x = Math.floor(p.x * dpr);
+  const y = Math.floor(p.y * dpr);
+  const w = cv.width, h = cv.height;
+  const imgData = ctxDraw.getImageData(0, 0, w, h);
+  const data = imgData.data;
+  const idx = (y * w + x) * 4;
+  const target = [data[idx], data[idx+1], data[idx+2], data[idx+3]];
+  const hex = document.getElementById('colorPick').value;
+  const fr = parseInt(hex.slice(1,3),16);
+  const fg = parseInt(hex.slice(3,5),16);
+  const fb = parseInt(hex.slice(5,7),16);
+  if (target[0]===fr && target[1]===fg && target[2]===fb && target[3]===255) return;
+  const stack = [[x,y]];
+  const seen = new Uint8Array(w*h);
+  const tol = 30;
+  function match(i) {
+    return Math.abs(data[i]-target[0])<tol && Math.abs(data[i+1]-target[1])<tol &&
+           Math.abs(data[i+2]-target[2])<tol && Math.abs(data[i+3]-target[3])<tol;
+  }
+  while (stack.length) {
+    const [cx, cy] = stack.pop();
+    if (cx<0||cy<0||cx>=w||cy>=h) continue;
+    const pi = cy*w + cx;
+    if (seen[pi]) continue;
+    const di = pi*4;
+    if (!match(di)) continue;
+    seen[pi] = 1;
+    data[di]=fr; data[di+1]=fg; data[di+2]=fb; data[di+3]=255;
+    stack.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);
+  }
+  ctxDraw.putImageData(imgData, 0, 0);
+}
+
+/* ============================================================
+   ФРАЗЫ: рендер + слоты затухания
+   ============================================================ */
+function renderPhrases() {
+  const layer = document.getElementById('phrasesLayer');
+  layer.innerHTML = '';
+  if (!currentScene) return;
+  // в редакторе показываем ВСЕ фразы в стеке (как в финале)
+  currentScene.phrases.forEach((ph, i) => {
+    const div = document.createElement('div');
+    div.className = 'phrase';
+    div.dataset.id = ph.id;
+    div.textContent = ph.text;
+    div.style.fontSize = (ph.size || 22) + 'px';
+    div.style.color = ph.color || '#1a1a1a';
+    layer.appendChild(div);
+  });
+  updatePhraseSlots(currentScene.phrases.length);
+}
+
+/**
+ * Раскладывает фразы по слотам затухания.
+ * visibleCount — сколько фраз реально «в стопке».
+ * Слот 0 — текущая (яркая, внизу).
+ * Слот 1 — под ней тусклая.
+ * Слот 2 — над ней совсем тусклая.
+ * Слот 3+ — невидима (уходит вверх и исчезает).
+ *
+ * Логика «на 3-й фразе под ней две тусклые»:
+ * когда видны фразы 1,2,3 — фраза 3 = слот 0, фраза 2 = слот 1, фраза 1 = слот 2.
+ * На 4-й фразе фраза 1 уходит в слот 3 (исчезает), фразы 2,3,4 занимают слоты 2,1,0.
+ */
+function updatePhraseSlots(visibleCount) {
+  const els = Array.from(document.querySelectorAll('#phrasesLayer .phrase'));
+  const n = visibleCount;
+  els.forEach((el, i) => {
+    el.classList.remove('slot-0', 'slot-1', 'slot-2', 'slot-3');
+    // индекс с конца: 0 = последняя (текущая), 1 = предпоследняя, ...
+    const fromEnd = n - 1 - i;
+    if (fromEnd === 0) el.classList.add('slot-0');
+    else if (fromEnd === 1) el.classList.add('slot-1');
+    else if (fromEnd === 2) el.classList.add('slot-2');
+    else el.classList.add('slot-3');
+  });
+}
+
+/* ============================================================
+   КНОПКИ / ВЫБОРЫ: с позицией, цветом, заливкой
+   ============================================================ */
+function renderChoices() {
+  const layer = document.getElementById('choicesLayer');
+  layer.innerHTML = '';
+  if (!currentScene) return;
+  currentScene.choices.forEach(ch => {
+    const btn = document.createElement('button');
+    btn.className = 'choiceBtn';
+    btn.textContent = ch.label;
+    btn.style.left = (ch.x ?? 50) + '%';
+    btn.style.bottom = (ch.y ?? 20) + '%';
+    btn.style.transform = 'translateX(-50%)';
+    btn.style.background = ch.bg || '#ffffff';
+    btn.style.color = ch.textColor || '#1a1a1a';
+    btn.style.borderColor = ch.borderColor || '#222222';
+    btn.onclick = () => {
+      if (playing) { goToTarget(ch); return; }
+      // в редакторе: открываем целевую сцену
+      if (ch.targetId) {
+        const t = findScene(ch.targetId);
+        if (t) openScene(t.id);
+        else alert('Сцена не найдена');
+      } else {
+        const ns = newScene(currentScene.id);
+        ch.targetId = ns.id;
+        save();
+        openScene(ns.id);
+      }
+    };
+    layer.appendChild(btn);
+  });
+}
+
+function goToTarget(ch) {
+  if (!ch.targetId) {
+    const ns = newScene(currentScene.id);
+    ch.targetId = ns.id;
+    save();
+  }
+  const t = findScene(ch.targetId);
+  if (t) openScene(t.id);
+}
+
+let editingChoiceId = null;
+
+function openChoiceModal(editId) {
+  if (!currentScene) return;
+  editingChoiceId = editId || null;
+  const modal = document.getElementById('choiceModal');
+  modal.classList.remove('hidden');
+  const sel = document.getElementById('choiceTarget');
+  sel.innerHTML = '<option value="new">— Новая пустая сцена —</option>';
+  state.scenes.forEach(s => {
+    if (s.id !== currentScene.id) {
+      const o = document.createElement('option');
+      o.value = s.id;
+      o.textContent = s.title;
+      sel.appendChild(o);
+    }
+  });
+
+  if (editId) {
+    const ch = currentScene.choices.find(c => c.id === editId);
+    if (ch) {
+      document.getElementById('choiceLabel').value = ch.label;
+      document.getElementById('choiceBg').value = ch.bg || '#ffffff';
+      document.getElementById('choiceText').value = ch.textColor || '#1a1a1a';
+      document.getElementById('choiceBorder').value = ch.borderColor || '#222222';
+      document.getElementById('choiceX').value = ch.x ?? 50;
+      document.getElementById('choiceY').value = ch.y ?? 20;
+      document.getElementById('choiceXVal').textContent = (ch.x ?? 50) + '%';
+      document.getElementById('choiceYVal').textContent = (ch.y ?? 20) + '%';
+      if (ch.targetId) sel.value = ch.targetId;
+      else sel.value = 'new';
+    }
+  } else {
+    document.getElementById('choiceLabel').value = '';
+    document.getElementById('choiceBg').value = '#ffffff';
+    document.getElementById('choiceText').value = '#1a1a1a';
+    document.getElementById('choiceBorder').value = '#222222';
+    document.getElementById('choiceX').value = 50;
+    document.getElementById('choiceY').value = 20;
+    document.getElementById('choiceXVal').textContent = '50%';
+    document.getElementById('choiceYVal').textContent = '20%';
+    sel.value = 'new';
+  }
+}
+
+function saveChoice() {
+  if (!currentScene) return;
+  const label = document.getElementById('choiceLabel').value.trim();
+  if (!label) { alert('Введите надпись'); return; }
+  const targetVal = document.getElementById('choiceTarget').value;
+  let targetId = null;
+  if (targetVal === 'new') {
+    const ns = newScene(currentScene.id);
+    targetId = ns.id;
+  } else targetId = targetVal;
+
+  const data = {
+    label,
+    bg: document.getElementById('choiceBg').value,
+    textColor: document.getElementById('choiceText').value,
+    borderColor: document.getElementById('choiceBorder').value,
+    x: parseInt(document.getElementById('choiceX').value),
+    y: parseInt(document.getElementById('choiceY').value),
+    targetId,
+  };
+
+  if (editingChoiceId) {
+    const ch = currentScene.choices.find(c => c.id === editingChoiceId);
+    if (ch) Object.assign(ch, data);
+  } else {
+    currentScene.choices.push({ id: uid(), ...data });
+  }
+  closeModal('choiceModal');
+  renderChoices();
+  save();
+}
+
+/* ============================================================
+   ЭФФЕКТЫ
+   ============================================================ */
+function openEffectModal() {
+  if (!currentScene) return;
+  document.getElementById('effectType').value = currentScene.effect.type || 'none';
+  document.getElementById('effectDur').value = currentScene.effect.dur || 3;
+  document.getElementById('effectModal').classList.remove('hidden');
+}
+
+function saveEffect() {
+  if (!currentScene) return;
+  currentScene.effect.type = document.getElementById('effectType').value;
+  currentScene.effect.dur = parseInt(document.getElementById('effectDur').value) || 3;
+  closeModal('effectModal');
+  applyEffect();
+  save();
+}
+
+function applyEffect() {
+  const el = document.getElementById('effectLayer');
+  if (!currentScene) return;
+  el.className = '';
+  el.style.animation = '';
+  el.style.removeProperty('--dur');
+  const eff = currentScene.effect;
+  if (eff.type === 'fade-dark') {
+    el.style.setProperty('--dur', eff.dur + 's');
+    el.classList.add('fade-dark');
+  } else if (eff.type === 'blink') {
+    el.style.setProperty('--dur', eff.dur + 's');
+    el.classList.add('blink');
+  }
+}
+
+/* ============================================================
+   ПРОИГРЫВАНИЕ СЦЕНЫ (кнопка ▶)
+   ============================================================ */
+function startPlaying() {
+  if (!currentScene || playing) return;
+  if (currentScene.phrases.length === 0) { alert('Добавьте хотя бы одну фразу'); return; }
+  playing = true;
+  const phone = document.getElementById('phone');
+  phone.classList.add('playing');
+  playTimers = [];
+
+  const layer = document.getElementById('phrasesLayer');
+  layer.innerHTML = '';
+
+  let idx = 0;
+  const total = currentScene.phrases.length;
+
+  function showNext() {
+    if (!playing) return;
+    if (idx >= total) {
+      // все фразы показаны — оставляем финальную картинку
+      return;
+    }
+    const ph = currentScene.phrases[idx];
+    const div = document.createElement('div');
+    div.className = 'phrase slot-0';
+    div.textContent = ph.text;
+    div.style.fontSize = (ph.size || 22) + 'px';
+    div.style.color = ph.color || '#1a1a1a';
+    layer.appendChild(div);
+
+    // пересчитываем слоты для всех видимых
+    const all = Array.from(layer.querySelectorAll('.phrase'));
+    all.forEach((el, i) => {
+      el.classList.remove('slot-0', 'slot-1', 'slot-2', 'slot-3');
+      const fromEnd = all.length - 1 - i;
+      if (fromEnd === 0) el.classList.add('slot-0');
+      else if (fromEnd === 1) el.classList.add('slot-1');
+      else if (fromEnd === 2) el.classList.add('slot-2');
+      else el.classList.add('slot-3');
+    });
+
+    // удаляем исчезнувшие
+    all.forEach(el => {
+      if (el.classList.contains('slot-3')) {
+        setTimeout(() => el.remove(), 750);
+      }
+    });
+
+    // аудио
+    if (ph.audio) {
+      const audio = new Audio(ph.audio);
+      audio.play().catch(() => {});
+    }
+
+    idx++;
+    // интервал появления: 1.8с по умолчанию, или до конца аудио
+    const delay = 2200;
+    playTimers.push(setTimeout(showNext, delay));
+  }
+
+  // эффекты
+  applyEffect();
+  showNext();
+}
+
+function stopPlaying() {
+  playing = false;
+  playTimers.forEach(t => clearTimeout(t));
+  playTimers = [];
+  document.getElementById('phone').classList.remove('playing');
+  if (currentScene) {
+    renderPhrases();
+    renderChoices();
+    applyEffect();
+  }
+}
+
+/* ============================================================
+   ТЕКСТЫ
+   ============================================================ */
+function openTextsModal() {
+  if (!currentScene) return;
+  const list = document.getElementById('textsList');
+  list.innerHTML = '';
+  if (currentScene.phrases.length === 0) {
+    list.innerHTML = '<p style="color:#666;font-size:13px;">Нет фраз</p>';
+  }
+  currentScene.phrases.forEach(ph => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;background:#1a1a22;padding:6px;border-radius:6px;';
+    row.innerHTML = `
+      <div style="flex:1;font-size:13px;">${escapeHtml(ph.text)} ${ph.audio ? '🎙' : ''}</div>
+      <button data-id="${ph.id}" data-act="edit" style="background:#3a3a44;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:11px;">✏️</button>
+      <button data-id="${ph.id}" data-act="del" style="background:#6a3030;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:11px;">🗑</button>
+    `;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      if (b.dataset.act === 'edit') { closeModal('textsModal'); openPhraseModal(b.dataset.id); }
+      if (b.dataset.act === 'del') {
+        currentScene.phrases = currentScene.phrases.filter(p => p.id !== b.dataset.id);
+        save(); renderPhrases(); openTextsModal();
+      }
+    };
+  });
+  document.getElementById('textsModal').classList.remove('hidden');
+}
+
+let editingPhraseId = null;
+
+function openPhraseModal(editId) {
+  if (!currentScene) return;
+  editingPhraseId = editId || null;
+  document.getElementById('phraseModal').classList.remove('hidden');
+  document.getElementById('audioStatus').textContent = '';
+  window._pendingAudio = null;
+  if (editId) {
+    const ph = currentScene.phrases.find(p => p.id === editId);
+    if (ph) {
+      document.getElementById('phraseText').value = ph.text;
+      document.getElementById('phraseSize').value = ph.size || 22;
+      document.getElementById('phraseColor').value = ph.color || '#1a1a1a';
+      document.getElementById('audioStatus').textContent = ph.audio ? '✅ Аудио прикреплено' : '';
+    }
+  } else {
+    document.getElementById('phraseText').value = '';
+    document.getElementById('phraseSize').value = 22;
+    document.getElementById('phraseColor').value = '#1a1a1a';
+  }
+}
+
+function savePhrase() {
+  if (!currentScene) return;
+  const text = document.getElementById('phraseText').value.trim();
+  if (!text) { alert('Введите текст'); return; }
+  const data = {
+    id: editingPhraseId || uid(),
+    text,
+    size: parseInt(document.getElementById('phraseSize').value) || 22,
+    color: document.getElementById('phraseColor').value,
+    audio: null,
+  };
+  if (editingPhraseId) {
+    const idx = currentScene.phrases.findIndex(p => p.id === editingPhraseId);
+    if (idx >= 0) {
+      data.audio = currentScene.phrases[idx].audio;
+      currentScene.phrases[idx] = data;
+    }
+  } else {
+    if (window._pendingAudio) data.audio = window._pendingAudio;
+    currentScene.phrases.push(data);
+  }
+  closeModal('phraseModal');
+  renderPhrases();
+  save();
+}
+
+/* ============================================================
+   АУДИО
+   ============================================================ */
+let mediaRecorder = null;
+let recordedChunks = [];
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    recordedChunks = [];
+    mediaRecorder.ondataavailable = e => { if (e.data.size) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (editingPhraseId) {
+          const ph = currentScene.phrases.find(p => p.id === editingPhraseId);
+          if (ph) { ph.audio = reader.result; save(); }
+        } else {
+          window._pendingAudio = reader.result;
+        }
+        document.getElementById('audioStatus').textContent = '✅ Аудио записано';
+      };
+      reader.readAsDataURL(blob);
+      stream.getTracks().forEach(t => t.stop());
+    };
+    mediaRecorder.start();
+    document.getElementById('btnRecAudio').classList.add('hidden');
+    document.getElementById('btnStopRec').classList.remove('hidden');
+    document.getElementById('audioStatus').textContent = '🔴 Запись...';
+  } catch(e) { alert('Нет доступа к микрофону: ' + e.message); }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  document.getElementById('btnRecAudio').classList.remove('hidden');
+  document.getElementById('btnStopRec').classList.add('hidden');
+}
+
+function loadAudioFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (editingPhraseId) {
+      const ph = currentScene.phrases.find(p => p.id === editingPhraseId);
+      if (ph) { ph.audio = reader.result; save(); }
+    } else {
+      window._pendingAudio = reader.result;
+    }
+    document.getElementById('audioStatus').textContent = '✅ Аудио загружено';
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ============================================================
+   ЭКСПОРТ / ИМПОРТ
+   ============================================================ */
+function exportAll() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'game_draft_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+
+function importAll(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const d = JSON.parse(reader.result);
+      if (d.scenes) {
+        state.scenes = d.scenes;
+        state.currentId = d.currentId;
+        save();
+        renderSceneList();
+        alert('Импортировано сцен: ' + d.scenes.length);
+      }
+    } catch(err) { alert('Ошибка импорта: ' + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+/* ============================================================
+   ТУЛБАР
+   ============================================================ */
+function updateToolUI() {
+  document.querySelectorAll('.tool').forEach(b => {
+    b.classList.toggle('active', b.dataset.tool === currentTool);
+  });
+  applyStrokeStyle();
+}
+document.querySelectorAll('.tool').forEach(b => {
+  b.onclick = () => { currentTool = b.dataset.tool; updateToolUI(); };
+});
+document.getElementById('colorPick').oninput = applyStrokeStyle;
+document.getElementById('sizePick').onchange = applyStrokeStyle;
+
+document.getElementById('btnUndo').onclick = () => {
+  if (drawHistory.length > 1) {
+    drawHistory.pop();
+    restoreFromHistory();
+    setTimeout(() => {
+      if (currentScene) { currentScene.drawing = drawCv.toDataURL(); save(); }
+    }, 60);
+  }
+};
+
+document.getElementById('btnClearDraw').onclick = () => {
+  if (!currentScene) return;
+  if (!confirm('Очистить рисунок?')) return;
+  const w = drawCv.width / (window.devicePixelRatio || 1);
+  const h = drawCv.height / (window.devicePixelRatio || 1);
+  ctxDraw.clearRect(0, 0, w, h);
+  currentScene.drawing = null;
+  pushHistory();
+  save();
+};
+
+document.getElementById('btnImageBg').onclick = () => {
+  if (!currentScene) return;
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      currentScene.bgImage = reader.result;
+      renderSceneBackground();
+      save();
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+};
+
+document.getElementById('btnBackHome').onclick = () => {
+  if (currentScene) { currentScene.drawing = drawCv.toDataURL(); save(); }
+  stopPlaying();
+  document.getElementById('homeScreen').classList.remove('hidden');
+  document.getElementById('drawToolbar').classList.add('hidden');
+  document.getElementById('bottomBar').classList.add('hidden');
+  document.getElementById('canvasWrap').classList.add('hidden');
+  renderSceneList();
+};
+
+/* ============================================================
+   НИЖНЯЯ ПАНЕЛЬ
+   ============================================================ */
+document.getElementById('btnAddPhrase').onclick = () => openPhraseModal(null);
+document.getElementById('btnAddChoice').onclick = () => openChoiceModal(null);
+document.getElementById('btnAddNext').onclick = () => {
+  if (!currentScene) return;
+  const ns = newScene(currentScene.id);
+  currentScene.choices.push({
+    id: uid(),
+    label: '➡ Далее',
+    bg: '#ffffff',
+    textColor: '#1a1a1a',
+    borderColor: '#222222',
+    x: 50,
+    y: 12,
+    targetId: ns.id,
+  });
+  save();
+  renderChoices();
+};
+document.getElementById('btnEffects').onclick = openEffectModal;
+document.getElementById('btnTexts').onclick = openTextsModal;
+document.getElementById('btnSave').onclick = () => {
+  if (currentScene) { currentScene.drawing = drawCv.toDataURL(); save(); }
+  alert('Сохранено в браузере.');
+};
+
+/* ============================================================
+   МОДАЛКИ / ЗАКРЫТИЕ
+   ============================================================ */
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+document.getElementById('btnRecAudio').onclick = startRecording;
+document.getElementById('btnStopRec').onclick = stopRecording;
+document.getElementById('btnLoadAudio').onclick = () => document.getElementById('audioFile').click();
+document.getElementById('audioFile').onchange = loadAudioFile;
+
+// ползунки позиции кнопки
+document.getElementById('choiceX').oninput = e => {
+  document.getElementById('choiceXVal').textContent = e.target.value + '%';
+};
+document.getElementById('choiceY').oninput = e => {
+  document.getElementById('choiceYVal').textContent = e.target.value + '%';
+};
+
+/* ============================================================
+   РИСОВАНИЕ: СОБЫТИЯ
+   ============================================================ */
+drawCv.addEventListener('mousedown', startDraw);
+drawCv.addEventListener('mousemove', moveDraw);
+drawCv.addEventListener('mouseup', endDraw);
+drawCv.addEventListener('mouseleave', endDraw);
+drawCv.addEventListener('touchstart', startDraw, { passive: false });
+drawCv.addEventListener('touchmove', moveDraw, { passive: false });
+drawCv.addEventListener('touchend', endDraw);
+drawCv.addEventListener('touchcancel', endDraw);
+
+/* ============================================================
+   КНОПКА ▶ / ⏹
+   ============================================================ */
+document.getElementById('btnPlayScene').onclick = startPlaying;
+document.getElementById('btnStopPlay').onclick = stopPlaying;
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+load();
+renderSceneList();
+document.getElementById('drawToolbar').classList.add('hidden');
+document.getElementById('bottomBar').classList.add('hidden');
+document.getElementById('canvasWrap').classList.add('hidden');
+</script>
+</body>
+</html>
